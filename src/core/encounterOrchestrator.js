@@ -22,6 +22,7 @@ import {
   TREASURE_BLOCK_GAIN,
 } from "./config.js?v=20260821-40";
 import { addEffect, updateEffects } from "./effects.js?v=20260821-36";
+import { addUiEffect } from "./uiEffects.js?v=20260821-2";
 import { COLORS } from "../theme/colors.js?v=20260821-14";
 
 export function startEncounter(game) {
@@ -83,25 +84,28 @@ function completeEncounterEvent(game, event) {
 
   if (event.type === "normal") {
     game.board[event.y][event.x] = null;
-    applyNormalBlock(game, event.block);
+    applyNormalBlock(game, event);
     return;
   }
 
   if (event.type === "monster") {
     game.board[event.y][event.x] = null;
-    if (!event.block.slayed) takeDamage(game);
+    if (!event.block.slayed) takeDamage(game, event);
   }
 }
 
-function applyNormalBlock(game, block) {
+function applyNormalBlock(game, event) {
+  const block = event.block;
   const player = game.player;
 
   if (block.type === "B") {
     healPlayer(player, HEAL_BLOCK_BODY_GAIN);
+    addUiEffect(game, { type: "travel", label: "體", color: COLORS.red, target: "body", x: event.x, y: event.y });
   }
 
   if (block.type === "D") {
     player.swordSkill += SWORD_BLOCK_SKILL_GAIN;
+    addUiEffect(game, { type: "travel", label: "劍", color: COLORS.corners.sword, target: "sword", x: event.x, y: event.y });
   }
 
   if (block.type === "L") {
@@ -116,6 +120,7 @@ function applyNormalBlock(game, block) {
 
   if (block.type === "T") {
     player.treasure += TREASURE_BLOCK_GAIN;
+    addUiEffect(game, { type: "travel", label: "寶", color: COLORS.corners.treasure, target: "treasure", x: event.x, y: event.y });
   }
 
   if (block.type === "O") {
@@ -201,9 +206,9 @@ function removeSlainMonsters(board) {
   }
 }
 
-function takeDamage(game) {
+function takeDamage(game, event) {
   const bonus = game.encounter?.curseBonus ?? 0;
-  const monsterValue = game.encounter?.current?.block?.value ?? 1;
+  const monsterValue = event?.block?.value ?? game.encounter?.current?.block?.value ?? 1;
   const incomingDamage = monsterValue + bonus;
   const shieldedDamage = Math.min(game.encounter?.shield ?? 0, incomingDamage);
   const finalDamage = incomingDamage - shieldedDamage;
@@ -211,6 +216,7 @@ function takeDamage(game) {
   if (game.encounter) game.encounter.shield -= shieldedDamage;
   game.player.body -= finalDamage;
   if (game.encounter) game.encounter.curseBonus = 0;
+  if (finalDamage > 0) addUiEffect(game, { type: "shake", target: "body" });
 
   if (game.player.body <= 0) {
     game.gameOver = true;

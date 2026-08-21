@@ -15,7 +15,7 @@ import {
   TEMPER_BODY_BODY_GAIN,
   TEMPER_BODY_MAX_BODY_GAIN,
 } from "./config.js?v=20260821-40";
-import { clearEncounter, startEncounter, updateEncounter as updateEncounterState } from "./encounterOrchestrator.js?v=20260821-38";
+import { clearEncounter, startEncounter, updateEncounter as updateEncounterState } from "./encounterOrchestrator.js?v=20260821-39";
 import { canSkipMerchant, createMerchant, isModifierBlessing, moveMerchantSelectionIndex, shouldOpenMerchant } from "./merchant.js?v=20260821-46";
 import { createMonsterPiece, createNormalPiece } from "./pieces.js?v=20260821-30";
 import { createRun, getNextRound, peekUpcomingBlocks } from "./runOrchestrator.js?v=20260821-30";
@@ -47,6 +47,7 @@ export function createGame() {
     runComplete: false,
     encounter: null,
     effects: [],
+    uiEffects: [],
     merchant: null,
   };
 

@@ -31,6 +31,24 @@ body {
   overscroll-behavior: none;
 }
 
+.ui-effects {
+  position: fixed;
+  inset: 0;
+  z-index: 5;
+  pointer-events: none;
+}
+
+.ui-effect-glyph {
+  position: absolute;
+  left: 0;
+  top: 0;
+  font-family: "Huiwen-Fangsong", "STFangsong", "Songti TC", serif;
+  font-size: 2rem;
+  font-weight: 500;
+  line-height: 1;
+  will-change: transform, opacity;
+}
+
 .game-shell {
   position: relative;
   width: min(94vw, 620px);
@@ -125,7 +143,7 @@ canvas {
 .label {
   margin: 0;
   color: var(--muted);
-  font-size: 1.1rem;
+  font-size: 1.22rem;
   font-weight: 700;
   text-align: center;
   writing-mode: vertical-rl;
@@ -134,7 +152,7 @@ canvas {
 
 .value {
   margin: 0;
-  font-size: 1.4rem;
+  font-size: 1.56rem;
   font-weight: 800;
   line-height: 1;
   text-align: center;
@@ -146,15 +164,19 @@ canvas {
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: 12px;
+  gap: 18px;
 }
 
 .stat-item {
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: 6px;
+  gap: 9px;
   min-width: 0;
+}
+
+.stat-item.stat-pulse {
+  animation: stat-pulse 520ms ease-out both;
 }
 
 .stat-value-row {
@@ -169,6 +191,10 @@ canvas {
   gap: 3px 4px;
   align-items: center;
   justify-content: center;
+}
+
+.body-meter.hp-shake {
+  animation: hp-shake 420ms ease-in-out both;
 }
 
 .body-dot {
@@ -235,6 +261,43 @@ canvas {
   text-align: center;
   writing-mode: vertical-rl;
   text-orientation: upright;
+}
+
+@keyframes stat-pulse {
+  0% {
+    transform: scale(1);
+  }
+
+  35% {
+    transform: scale(1.16);
+  }
+
+  100% {
+    transform: scale(1);
+  }
+}
+
+@keyframes hp-shake {
+  0%,
+  100% {
+    transform: translateX(0);
+  }
+
+  20% {
+    transform: translateX(-3px);
+  }
+
+  40% {
+    transform: translateX(3px);
+  }
+
+  60% {
+    transform: translateX(-2px);
+  }
+
+  80% {
+    transform: translateX(2px);
+  }
 }
 
 button {
@@ -306,20 +369,20 @@ button:focus-visible {
   .stats-row {
     flex-direction: column;
     align-items: center;
-    gap: 10px;
+    gap: 14px;
   }
 
   .stat-item {
     flex-direction: column;
-    gap: 5px;
+    gap: 7px;
   }
 
   .label {
-    font-size: 1.14rem;
+    font-size: 1.24rem;
   }
 
   .value {
-    font-size: 1.42rem;
+    font-size: 1.58rem;
   }
 
   .stat-value-row {
