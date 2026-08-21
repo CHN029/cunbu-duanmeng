@@ -1,0 +1,53 @@
+<!doctype html>
+<html lang="zh-Hant">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+    <title>寸步短夢</title>
+    <link rel="stylesheet" href="./styles.css?v=20260821-71">
+  </head>
+  <body>
+    <main class="game-shell">
+      <section class="play-area" aria-label="寸步短夢棋盤">
+        <div id="upcoming" class="upcoming-row" aria-label="將至"></div>
+        <canvas id="game" width="300" height="564"></canvas>
+      </section>
+
+      <aside class="side-panel" aria-label="狀態">
+        <div class="status-block">
+          <div class="stats-row">
+            <div class="stat-item body-meter-section">
+              <p class="label">體</p>
+              <div class="stat-value-row">
+                <div id="body-meter" class="body-meter" aria-label="體魄與根骨"></div>
+              </div>
+            </div>
+            <div class="stat-item">
+              <p class="label">劍</p>
+              <p id="sword" class="value">一</p>
+            </div>
+            <div class="stat-item">
+              <p class="label">財</p>
+              <p id="treasure" class="value">無</p>
+            </div>
+            <div class="blessings-section">
+              <div id="blessings" class="blessing-tags" aria-label="已得福澤"></div>
+            </div>
+          </div>
+        </div>
+        <div class="mobile-pause-actions">
+          <button id="pause-run" type="button">止戈</button>
+        </div>
+        <div class="round-actions">
+          <p id="round" class="round-value">第一回合</p>
+          <button id="new-run" type="button">週而復始</button>
+        </div>
+        <div class="hidden-dev-controls">
+          <button id="show-shop" type="button">暫看行商</button>
+        </div>
+      </aside>
+    </main>
+
+    <script type="module" src="./src/main.js?v=20260821-76"></script>
+  </body>
+</html>
