@@ -1,4 +1,4 @@
-import { BOARD_HEIGHT, BOARD_WIDTH, NORMAL_COLUMNS } from "./config.js?v=20260821-40";
+import { BOARD_HEIGHT, BOARD_WIDTH, NORMAL_COLUMNS } from "./config.js?v=20260822-9";
 
 export function createBoard() {
   return Array.from({ length: BOARD_HEIGHT }, () => Array(BOARD_WIDTH).fill(null));
@@ -9,18 +9,28 @@ export function isNormalBottomRowFull(board) {
 }
 
 export function settleBoard(board) {
-  for (let x = 0; x < BOARD_WIDTH; x += 1) {
+  return settleBoardColumns(board, 0, BOARD_WIDTH - 1);
+}
+
+export function settleBoardColumns(board, startX, endX) {
+  const movements = [];
+
+  for (let x = startX; x <= endX; x += 1) {
     const column = [];
 
     for (let y = BOARD_HEIGHT - 1; y >= 0; y -= 1) {
-      if (board[y][x]) column.push(board[y][x]);
+      if (board[y][x]) column.push({ block: board[y][x], fromY: y });
       board[y][x] = null;
     }
 
-    column.forEach((block, index) => {
-      board[BOARD_HEIGHT - 1 - index][x] = block;
+    column.forEach(({ block, fromY }, index) => {
+      const toY = BOARD_HEIGHT - 1 - index;
+      board[toY][x] = block;
+      if (fromY !== toY) movements.push({ block, x, fromY, toY });
     });
   }
+
+  return movements;
 }
 
 export function collides(board, piece, minX, maxX) {

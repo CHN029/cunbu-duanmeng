@@ -13,6 +13,7 @@
   --line: #bdbdbd;
   --accent: #333333;
   --red-heart: #b33a3a;
+  --shield-blue: #5f7fa8;
 }
 
 * {
@@ -43,10 +44,14 @@ body {
   left: 0;
   top: 0;
   font-family: "Huiwen-Fangsong", "STFangsong", "Songti TC", serif;
-  font-size: 2rem;
+  font-size: 1.72rem;
   font-weight: 500;
   line-height: 1;
   will-change: transform, opacity;
+}
+
+.ui-effect-glyph.expand {
+  font-size: 2.05rem;
 }
 
 .game-shell {
@@ -158,6 +163,15 @@ canvas {
   text-align: center;
   writing-mode: vertical-rl;
   text-orientation: upright;
+  will-change: transform, opacity;
+}
+
+.value-roll-up {
+  animation: value-roll-up 260ms ease-out both;
+}
+
+.value-roll-down {
+  animation: value-roll-down 260ms ease-out both;
 }
 
 .stats-row {
@@ -173,10 +187,6 @@ canvas {
   align-items: center;
   gap: 9px;
   min-width: 0;
-}
-
-.stat-item.stat-pulse {
-  animation: stat-pulse 520ms ease-out both;
 }
 
 .stat-value-row {
@@ -197,6 +207,10 @@ canvas {
   animation: hp-shake 420ms ease-in-out both;
 }
 
+.body-meter.shield-shake {
+  animation: shield-shake 440ms ease-in-out both;
+}
+
 .body-dot {
   width: 8px;
   height: 8px;
@@ -208,6 +222,11 @@ canvas {
 .body-dot.filled {
   border-color: var(--red-heart);
   background: var(--red-heart);
+}
+
+.body-dot.shielded {
+  border-color: var(--shield-blue);
+  background: var(--shield-blue);
 }
 
 .blessings-section {
@@ -263,20 +282,6 @@ canvas {
   text-orientation: upright;
 }
 
-@keyframes stat-pulse {
-  0% {
-    transform: scale(1);
-  }
-
-  35% {
-    transform: scale(1.16);
-  }
-
-  100% {
-    transform: scale(1);
-  }
-}
-
 @keyframes hp-shake {
   0%,
   100% {
@@ -297,6 +302,49 @@ canvas {
 
   80% {
     transform: translateX(2px);
+  }
+}
+
+@keyframes value-roll-up {
+  0% {
+    opacity: 0.32;
+    transform: translateY(0.42em);
+  }
+
+  100% {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes value-roll-down {
+  0% {
+    opacity: 0.32;
+    transform: translateY(-0.42em);
+  }
+
+  100% {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes shield-shake {
+  0%,
+  100% {
+    transform: translateY(0) scale(1);
+  }
+
+  30% {
+    transform: translateY(-2px) scale(1.08);
+  }
+
+  55% {
+    transform: translateY(2px) scale(0.98);
+  }
+
+  75% {
+    transform: translateY(-1px) scale(1.03);
   }
 }
 

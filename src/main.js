@@ -6,7 +6,7 @@ import {
   MONSTER_DROP_MS,
   MONSTER_FALL_STEP_ANIMATION_MS,
   NORMAL_COLUMNS,
-} from "./core/config.js?v=20260821-40";
+} from "./core/config.js?v=20260822-9";
 import {
   canMonstersDrop,
   canMove,
@@ -18,14 +18,15 @@ import {
   skipMerchant,
   tick,
   tickMonsters,
+  updateBoardAnimations,
   togglePause,
   updateEncounter,
-} from "./core/game.js?v=20260821-52";
-import { createCanvasRenderer } from "./renderers/canvasRenderer.js?v=20260821-55";
+} from "./core/game.js?v=20260822-14";
+import { createCanvasRenderer } from "./renderers/canvasRenderer.js?v=20260822-33";
 import { COLORS } from "./theme/colors.js?v=20260821-14";
 import { bindInput, bindSwipeInput } from "./ui/input.js?v=20260821-51";
 import { toChineseNumber } from "./ui/chineseNumbers.js?v=20260821-1";
-import { updateUiEffects } from "./core/uiEffects.js?v=20260821-2";
+import { updateUiEffects } from "./core/uiEffects.js?v=20260822-2";
 
 const uiEffects = document.querySelector("#ui-effects");
 const canvas = document.querySelector("#game");
@@ -38,16 +39,20 @@ const blessings = document.querySelector("#blessings");
 const newRun = document.querySelector("#new-run");
 const pauseRun = document.querySelector("#pause-run");
 const showShop = document.querySelector("#show-shop");
-const bodyStat = bodyMeter.closest(".stat-item");
-const swordStat = sword.closest(".stat-item");
-const treasureStat = treasure.closest(".stat-item");
+
+const ROLL_STEP_MS = 130;
 
 let game = null;
 let renderer = createCanvasRenderer(canvas);
 let lastTime = 0;
+let uiTime = 0;
 let dropCounter = 0;
 let monsterDropCounter = 0;
 let upcomingKey = "";
+const rollingStats = {
+  sword: createRollingStat(),
+  treasure: createRollingStat(),
+};
 
 bindInput(
   () => game,
@@ -69,23 +74,30 @@ requestAnimationFrame(loop);
 function loop(time) {
   const delta = time - lastTime;
   lastTime = time;
-  const running = game && !game.paused && !game.gameOver && !game.runComplete && !game.merchant;
+  uiTime = time;
+  const running = game && !game.paused && !game.gameOver && !game.runComplete && !game.encounterGate && !game.merchant;
 
-  if (game && !game.paused) updateUiEffects(game, delta);
+  if (game && !game.paused) {
+    updateUiEffects(game, delta);
+    updateBoardAnimations(game, delta);
+  }
 
   if (running) {
     updateEncounter(game, delta);
 
-    if (!game.encounter && hasActiveMonsters(game)) {
-      monsterDropCounter += delta;
+    if (!game.encounter) {
+      if (hasActiveMonsters(game)) {
+        monsterDropCounter += delta;
 
-      if (monsterDropCounter >= MONSTER_DROP_MS) {
-        tickMonsters(game);
-        monsterDropCounter -= MONSTER_DROP_MS;
+        if (monsterDropCounter >= MONSTER_DROP_MS) {
+          tickMonsters(game);
+          monsterDropCounter -= MONSTER_DROP_MS;
+        }
+      } else {
+        monsterDropCounter = 0;
       }
-    } else if (!game.encounter) {
+
       dropCounter += delta;
-      monsterDropCounter = 0;
 
       if (dropCounter >= game.dropMs) {
         tick(game);
@@ -104,7 +116,7 @@ function render() {
     return;
   }
 
-  const running = !game.paused && !game.gameOver && !game.runComplete && !game.merchant;
+  const running = !game.paused && !game.gameOver && !game.runComplete && !game.encounterGate && !game.merchant;
   const normalDropProgress = running && !game.encounter && canMove(game, 0, 1) ? getStepDropProgress(dropCounter) : 0;
   const monsterDropProgress = running && !game.encounter && canMonstersDrop(game) ? getMonsterStepDropProgress(monsterDropCounter) : 0;
 
@@ -112,8 +124,8 @@ function render() {
   round.textContent = `第${toChineseNumber(Math.min(game.run.currentRound, game.run.totalRounds))}回合`;
   newRun.textContent = "週而復始";
   renderBodyMeter();
-  sword.textContent = toChineseNumber(game.player.swordSkill);
-  treasure.textContent = toChineseNumber(game.player.treasure);
+  renderRollingStat(sword, rollingStats.sword, game.player.swordSkill);
+  renderRollingStat(treasure, rollingStats.treasure, game.player.treasure);
   renderUpcoming();
   renderBlessings();
   renderUiEffects();
@@ -125,6 +137,7 @@ function renderIdle() {
   renderer.drawIdle({ width: BOARD_WIDTH, height: BOARD_HEIGHT, normalColumns: NORMAL_COLUMNS });
   round.textContent = "未開局";
   renderBodyDots(INITIAL_MAX_BODY, 0);
+  resetRollingStats();
   sword.textContent = "無";
   treasure.textContent = "無";
   upcomingKey = "";
@@ -151,17 +164,36 @@ function getMonsterStepDropProgress(elapsed) {
 }
 
 function renderBodyMeter() {
-  renderBodyDots(game.player.maxBody, Math.max(0, game.player.body));
+  renderBodyDots(game.player.maxBody, Math.max(0, game.player.body), game.encounter?.shield ?? 0);
 }
 
-function renderBodyDots(maxBody, currentBody) {
+function renderBodyDots(maxBody, currentBody, shield = 0) {
+  const shieldedIndexes = getShieldedBodyIndexes(maxBody, currentBody, shield);
+
   bodyMeter.replaceChildren(
     ...Array.from({ length: maxBody }, (_, index) => {
       const dot = document.createElement("span");
-      dot.className = `body-dot${index < currentBody ? " filled" : ""}`;
+      dot.className = `body-dot${index < currentBody ? " filled" : ""}${shieldedIndexes.has(index) ? " shielded" : ""}`;
       return dot;
     }),
   );
+}
+
+function getShieldedBodyIndexes(maxBody, currentBody, shield) {
+  const indexes = new Set();
+  const emptySlots = Math.max(0, maxBody - currentBody);
+  const emptyShield = Math.min(shield, emptySlots);
+
+  for (let index = currentBody; index < currentBody + emptyShield; index += 1) {
+    indexes.add(index);
+  }
+
+  const overlayShield = Math.min(currentBody, shield - emptyShield);
+  for (let index = currentBody - overlayShield; index < currentBody; index += 1) {
+    indexes.add(index);
+  }
+
+  return indexes;
 }
 
 function renderBlessings() {
@@ -185,38 +217,94 @@ function renderPauseButton() {
 }
 
 function renderUiEffects() {
-  const effects = game.uiEffects.filter((effect) => effect.type === "travel");
+  const effects = game.uiEffects.filter((effect) => effect.type === "expand" || (effect.type === "travel" && effect.elapsed >= 0));
 
   uiEffects.replaceChildren(
     ...effects.map((effect) => {
       const glyph = document.createElement("span");
-      const start = getBoardCellCenter(effect.x, effect.y);
       const end = getTargetCenter(effect.target);
-      const progress = easeOutCubic(Math.min(effect.elapsed / effect.duration, 1));
-      const x = start.x + (end.x - start.x) * progress;
-      const y = start.y + (end.y - start.y) * progress - 18 * Math.sin(progress * Math.PI);
-      const scale = 1 + 0.28 * Math.sin(progress * Math.PI);
+      const progress = Math.min(effect.elapsed / effect.duration, 1);
+      const visual = effect.type === "travel" ? getTravelEffectVisual(effect, end) : getExpandEffectVisual(end, progress);
 
-      glyph.className = "ui-effect-glyph";
+      glyph.className = `ui-effect-glyph ${effect.type}`;
       glyph.textContent = effect.label;
-      glyph.style.color = effect.color;
-      glyph.style.opacity = String(Math.max(0, 1 - progress * 0.18));
-      glyph.style.transform = `translate(${x}px, ${y}px) translate(-50%, -50%) scale(${scale})`;
+      glyph.style.color = visual.color ?? effect.color;
+      glyph.style.opacity = String(visual.opacity);
+      glyph.style.transform = `translate(${visual.x}px, ${visual.y}px) translate(-50%, -50%) scale(${visual.scale})`;
       return glyph;
     }),
   );
 }
 
-function renderPanelEffects() {
-  const hasBodyPulse = hasActiveUiEffect("body", "travel");
-  const hasSwordPulse = hasActiveUiEffect("sword", "travel");
-  const hasTreasurePulse = hasActiveUiEffect("treasure", "travel");
-  const hasBodyShake = hasActiveUiEffect("body", "shake");
+function getTravelEffectVisual(effect, end) {
+  const start = getBoardCellCenter(effect.x, effect.y);
+  const rawProgress = Math.min(effect.elapsed / effect.duration, 1);
+  const travelProgress = easeInQuad(rawProgress);
 
-  bodyStat.classList.toggle("stat-pulse", hasBodyPulse);
+  return {
+    x: getTravelX(start, end, travelProgress),
+    y: getTravelY(start, end, travelProgress),
+    scale: 1 - 0.34 * rawProgress,
+    opacity: Math.max(0, 0.74 - rawProgress * 0.3),
+    color: mixHexColors(COLORS.glyph, effect.color, rawProgress),
+  };
+}
+
+function getTravelX(start, end, progress) {
+  const horizontalProgress = progress ** 1.28;
+  return start.x + (end.x - start.x) * horizontalProgress;
+}
+
+function getTravelY(start, end, progress) {
+  const directY = start.y + (end.y - start.y) * progress;
+  const arcedY = directY - getTravelArcHeight(start, end) * Math.sin(progress * Math.PI);
+  return Math.max(arcedY, end.y);
+}
+
+function getTravelArcHeight(start, end) {
+  const distance = Math.hypot(end.x - start.x, end.y - start.y);
+  return Math.min(70, Math.max(22, distance * 0.14));
+}
+
+function mixHexColors(from, to, amount) {
+  const start = hexToRgb(from);
+  const end = hexToRgb(to);
+  if (!start || !end) return to;
+
+  const mix = (channel) => Math.round(start[channel] + (end[channel] - start[channel]) * amount);
+  return `rgb(${mix("r")}, ${mix("g")}, ${mix("b")})`;
+}
+
+function easeInQuad(value) {
+  return value * value;
+}
+
+function hexToRgb(hex) {
+  const match = /^#?([a-f\d]{2})([a-f\d]{2})([a-f\d]{2})$/i.exec(hex);
+  if (!match) return null;
+
+  return {
+    r: parseInt(match[1], 16),
+    g: parseInt(match[2], 16),
+    b: parseInt(match[3], 16),
+  };
+}
+
+function getExpandEffectVisual(center, progress) {
+  return {
+    x: center.x,
+    y: center.y,
+    scale: 1 + progress * 1.35,
+    opacity: Math.max(0, 0.82 * (1 - progress)),
+  };
+}
+
+function renderPanelEffects() {
+  const hasBodyShake = hasActiveUiEffect("body", "shake");
+  const hasShieldShake = hasActiveUiEffect("body", "expand");
+
   bodyMeter.classList.toggle("hp-shake", hasBodyShake);
-  swordStat.classList.toggle("stat-pulse", hasSwordPulse);
-  treasureStat.classList.toggle("stat-pulse", hasTreasurePulse);
+  bodyMeter.classList.toggle("shield-shake", hasShieldShake);
 }
 
 function hasActiveUiEffect(target, type) {
@@ -233,6 +321,59 @@ function getBoardCellCenter(x, y) {
     x: left + cell / 2,
     y: rect.top + y * cell + cell / 2,
   };
+}
+
+function createRollingStat() {
+  return {
+    from: null,
+    target: null,
+    display: null,
+    lastRendered: null,
+    startedAt: 0,
+  };
+}
+
+function renderRollingStat(element, state, target) {
+  if (state.display == null) {
+    state.from = target;
+    state.target = target;
+    state.display = target;
+  }
+
+  if (state.target !== target) {
+    state.from = state.display;
+    state.target = target;
+    state.startedAt = uiTime;
+  }
+
+  const diff = state.target - state.from;
+  const direction = Math.sign(diff);
+  const steps = Math.min(Math.abs(diff), Math.floor((uiTime - state.startedAt) / ROLL_STEP_MS));
+  state.display = state.from + direction * steps;
+
+  renderRollingText(element, state, direction);
+}
+
+function renderRollingText(element, state, direction) {
+  if (state.lastRendered === state.display) return;
+
+  element.textContent = toChineseNumber(Math.max(0, state.display));
+  if (state.lastRendered != null && direction !== 0) {
+    element.classList.remove("value-roll-up", "value-roll-down");
+    void element.offsetWidth;
+    element.classList.add(direction > 0 ? "value-roll-up" : "value-roll-down");
+  }
+  state.lastRendered = state.display;
+}
+
+function resetRollingStats() {
+  Object.values(rollingStats).forEach((state) => {
+    state.from = null;
+    state.target = null;
+    state.display = null;
+    state.lastRendered = null;
+    state.startedAt = 0;
+  });
 }
 
 function getTargetCenter(target) {

@@ -1,5 +1,5 @@
 import { drawMerchant } from "./merchantRenderer.js?v=20260821-42";
-import { CHAIN_SLASH_DAMAGE_PER_SLASH } from "../core/config.js?v=20260821-40";
+import { CHAIN_SLASH_DAMAGE_PER_SLASH } from "../core/config.js?v=20260822-9";
 import { COLORS } from "../theme/colors.js?v=20260821-14";
 
 export function createCanvasRenderer(canvas) {
@@ -35,7 +35,9 @@ export function createCanvasRenderer(canvas) {
         return;
       }
       drawGrid(context, game.width, game.height, cell, game.normalColumns, laneGap);
+      drawEncounterGate(context, game, cell, laneGap);
       drawBoard(context, game.board, cell, game.normalColumns, laneGap, game);
+      drawExitAnimations(context, game, cell, game.normalColumns, laneGap);
       drawPiece(context, game.active.normal, cell, game.normalColumns, laneGap, game, normalDropProgress);
       drawPiece(context, game.active.monsters, cell, game.normalColumns, laneGap, game, monsterDropProgress);
       drawLaneDivider(context, canvas, game.normalColumns, cell, laneGap);
@@ -83,6 +85,41 @@ function drawGrid(context, width, height, cell, normalColumns, laneGap) {
   }
 }
 
+function drawEncounterGate(context, game, cell, laneGap) {
+  if (!game.encounter && !game.encounterGate) return;
+
+  const top = (game.height - 1) * cell;
+  const totalWidth = game.width * cell + laneGap;
+
+  context.save();
+  if (game.encounterGate) {
+    drawEncounterGateExit(context, game, top, totalWidth, cell);
+  } else {
+    drawEncounterGateIntro(context, game, top, totalWidth, cell);
+  }
+  context.restore();
+}
+
+function drawEncounterGateIntro(context, game, top, totalWidth, cell) {
+  const progress = Math.min((game.encounter.introElapsed ?? 0) / (game.encounter.introDuration ?? 1), 1);
+  const fillWidth = (totalWidth / 2) * progress;
+  const fillAlpha = 0.052 * progress;
+
+  context.fillStyle = `rgba(178, 143, 92, ${fillAlpha})`;
+  context.fillRect(0, top, fillWidth, cell);
+  context.fillRect(totalWidth - fillWidth, top, fillWidth, cell);
+}
+
+function drawEncounterGateExit(context, game, top, totalWidth, cell) {
+  const progress = Math.min((game.encounterGate?.elapsed ?? 0) / (game.encounterGate?.duration ?? 1), 1);
+  const eased = easeOutCubic(Math.min(progress * 1.65, 1));
+  const y = top + cell * 1.18 * eased;
+  const fillAlpha = 0.052 * (1 - progress * 0.22);
+
+  context.fillStyle = `rgba(178, 143, 92, ${fillAlpha})`;
+  context.fillRect(0, y, totalWidth, cell);
+}
+
 function drawPiece(context, piece, cell, normalColumns, laneGap, game, yOffset = 0) {
   if (!piece) return;
 
@@ -101,24 +138,31 @@ function getBlockYOffset(game, block, yOffset) {
 
 function drawCell(context, x, y, cell, block, normalColumns, laneGap, game, visual = {}) {
   const left = x * cell + (x >= normalColumns ? laneGap : 0);
-  const top = y * cell;
+  const animatedY = getSettledBlockY(game, block, y);
+  const top = animatedY * cell;
   const size = cell;
   const isMonster = block.lane === "monster";
-  const opacity = visual.opacity ?? getSlainBlockOpacity(game, block, x, y);
+  const opacity = visual.opacity ?? getBoardBlockOpacity(game, block, x, y);
 
   context.save();
   context.globalAlpha = opacity;
   drawCornerMarks(context, left, top, size, block);
   if (visual.monsterAttackProgress != null) drawMonsterAttackShadow(context, left, top, size, block, visual.monsterAttackProgress);
+  if (visual.slashChargeProgress != null) {
+    drawSlashCharge(context, left, top, size, visual.slashChargeProgress);
+    context.restore();
+    return;
+  }
 
   context.fillStyle = getGlyphColor(block);
   context.font = `${isMonster ? 500 : 400} ${Math.floor(cell * 0.7)}px "Huiwen-Fangsong", "STFangsong", "Songti TC", serif`;
   context.textAlign = "center";
   context.textBaseline = "middle";
   context.fillText(block.label, left + size / 2, top + size * getGlyphCenterY(block));
+  if (block.slayed && !block.damageReveal) drawSlainMonsterRing(context, left, top, size, getSlayMarkAlpha(block));
 
   if (isMonster) {
-    drawValueDots(context, left, top, size, block.value);
+    drawValueDots(context, left, top, size, getMonsterDisplayValue(block));
   }
   if (block.type === "L") {
     drawValueDots(context, left, top, size, getSlashDamage(game, block, x, y));
@@ -129,14 +173,59 @@ function drawCell(context, x, y, cell, block, normalColumns, laneGap, game, visu
   context.restore();
 }
 
+function getSettledBlockY(game, block, y) {
+  const animation = game.gravityAnimations?.find((item) => item.block === block);
+  if (!animation) return y;
+
+  const progress = Math.min((animation.elapsed ?? 0) / (animation.duration ?? 1), 1);
+  const eased = 1 - (1 - progress) ** 3;
+  return animation.fromY + (animation.toY - animation.fromY) * eased;
+}
+
+function getBoardBlockOpacity(game, block, x, y) {
+  const slainOpacity = getSlainBlockOpacity(game, block, x, y);
+  if (slainOpacity !== 1) return slainOpacity;
+  if (!game.encounter || y === game.height - 1) return 1;
+
+  const introProgress = Math.min((game.encounter.introElapsed ?? 0) / (game.encounter.introDuration ?? 1), 1);
+  const dim = 0.74 + 0.26 * (1 - introProgress);
+  return Math.min(1, dim);
+}
+
 function getSlainBlockOpacity(game, block, x, y) {
-  if (!block.slayed) return 1;
+  return 1;
+}
 
-  const slayEffect = game.effects.find((effect) => effect.label === "斬" && effect.x === x && effect.y === y && effect.elapsed >= 0);
-  if (!slayEffect) return 0.08;
+function getSlayMarkAlpha(block) {
+  if (!block.slayMark) return 1;
 
-  const progress = Math.min(slayEffect.elapsed / slayEffect.duration, 1);
-  return Math.max(0.08, 1 - progress);
+  const progress = Math.min((block.slayMark.elapsed ?? 0) / (block.slayMark.duration ?? 1), 1);
+  return easeOutCubic(progress);
+}
+
+function drawSlainMonsterRing(context, left, top, size, alpha = 1) {
+  context.save();
+  context.strokeStyle = COLORS.red;
+  context.globalAlpha *= 0.92 * alpha;
+  context.lineWidth = Math.max(2.2, size * 0.04);
+  context.beginPath();
+  context.arc(left + size / 2, top + size * 0.48, size * 0.24, 0, Math.PI * 2);
+  context.stroke();
+  context.restore();
+}
+
+function getMonsterDisplayValue(block) {
+  return block.damageReveal ? block.damageReveal.fromValue : block.value;
+}
+
+function drawExitAnimations(context, game, cell, normalColumns, laneGap) {
+  game.exitAnimations?.forEach((animation) => {
+    const progress = Math.min((animation.elapsed ?? 0) / (animation.duration ?? 1), 1);
+    const eased = easeInQuad(progress);
+    drawCell(context, animation.x, animation.y + eased * 1.18, cell, animation.block, normalColumns, laneGap, game, {
+      opacity: Math.max(0, 1 - progress * 0.18),
+    });
+  });
 }
 
 function drawValueDots(context, left, top, size, value, color = COLORS.red) {
@@ -169,7 +258,7 @@ function getSlashDamage(game, block, x, y) {
 function isEncounterSlashBlock(encounter, block, x, y) {
   if (!encounter) return false;
 
-  return [encounter.current, ...encounter.queue].some(
+  return getEncounterEvents(encounter).some(
     (event) => event?.type === "normal" && event.block === block && event.block.type === "L" && event.x === x && event.y === y,
   );
 }
@@ -180,17 +269,36 @@ function getArmorBlockValue(game, block) {
 
 function getEncounterVisual(encounter, block, x, y) {
   if (!encounter?.current) return { opacity: 1 };
-  const current = encounter.current;
-  const isCurrent = current.block === block && current.x === x && current.y === y;
+  const currentEvent = encounter.current.events.find((event) => event.block === block && event.x === x && event.y === y);
 
-  if (!isCurrent) return { opacity: 1 };
+  if (!currentEvent) return { opacity: 1 };
+  if (currentEvent.type === "monster" && block.slayed) return { opacity: 1 };
 
   const progress = encounter.elapsed / encounter.duration;
+  const shouldTravel = encounter.current.type === "support" && hasTravelingSupportGlyph(currentEvent);
+  const minOpacity = shouldTravel ? 1 : 0.08;
 
   return {
-    opacity: Math.max(0.08, 1 - progress),
-    monsterAttackProgress: current.type === "monster" && !block.slayed ? progress : null,
+    opacity: Math.max(minOpacity, 1 - progress),
+    monsterAttackProgress: currentEvent.type === "monster" && !block.slayed ? progress : null,
+    slashChargeProgress: shouldShowSlashCharge(encounter, currentEvent) ? progress : null,
   };
+}
+
+function shouldShowSlashCharge(encounter, event) {
+  if (event.block.type !== "L") return false;
+  return encounter.hasMonsters;
+}
+
+function hasTravelingSupportGlyph(event) {
+  return ["B", "D", "T", "E"].includes(event.block.type);
+}
+
+function getEncounterEvents(encounter) {
+  return [
+    ...(encounter.current?.events ?? []),
+    ...(encounter.queue ?? []).flatMap((group) => group.events),
+  ];
 }
 
 function drawMonsterAttackShadow(context, left, top, size, block, progress) {
@@ -214,6 +322,14 @@ function drawMonsterAttackShadow(context, left, top, size, block, progress) {
 function drawEffects(context, effects, cell, normalColumns, laneGap) {
   effects.forEach((effect) => {
     if (effect.elapsed < 0) return;
+    if (effect.type === "slashBeam") {
+      drawSlashBeam(context, effect, cell, normalColumns, laneGap);
+      return;
+    }
+    if (effect.type === "fadeGlyph") {
+      drawFadeGlyph(context, effect, cell, normalColumns, laneGap);
+      return;
+    }
 
     const progress = Math.min(effect.elapsed / effect.duration, 1);
     const left = effect.x * cell + (effect.x >= normalColumns ? laneGap : 0);
@@ -234,6 +350,146 @@ function drawEffects(context, effects, cell, normalColumns, laneGap) {
     context.fillText(effect.label, 0, 0);
     context.restore();
   });
+}
+
+function drawFadeGlyph(context, effect, cell, normalColumns, laneGap) {
+  const progress = Math.min(effect.elapsed / effect.duration, 1);
+  const left = effect.x * cell + (effect.x >= normalColumns ? laneGap : 0);
+  const top = effect.y * cell;
+  const alpha = Math.max(0, 0.8 * (1 - easeOutCubic(progress)));
+
+  context.save();
+  context.globalAlpha = alpha;
+  context.fillStyle = effect.color;
+  context.font = `500 ${Math.floor(cell * 0.74)}px "Huiwen-Fangsong", "STFangsong", "Songti TC", serif`;
+  context.textAlign = "center";
+  context.textBaseline = "middle";
+  context.fillText(effect.label, left + cell / 2, top + cell * 0.5);
+  context.restore();
+}
+
+function drawSlashCharge(context, left, top, size, progress) {
+  const centerX = left + size / 2;
+  const centerY = top + size * 0.5;
+  const squeeze = 1 - easeOutCubic(progress) * 0.92;
+  const alpha = 0.9 - progress * 0.16;
+
+  context.save();
+  context.globalAlpha *= alpha;
+  context.fillStyle = COLORS.red;
+  context.font = `500 ${Math.floor(size * 0.74)}px "Huiwen-Fangsong", "STFangsong", "Songti TC", serif`;
+  context.textAlign = "center";
+  context.textBaseline = "middle";
+  context.translate(centerX, centerY);
+  context.scale(1, squeeze);
+  context.fillText("斬", 0, 0);
+  context.restore();
+
+  if (progress < 0.55) return;
+
+  const lineProgress = (progress - 0.55) / 0.45;
+  context.save();
+  context.globalAlpha *= lineProgress * 0.78;
+  context.strokeStyle = COLORS.red;
+  context.lineWidth = Math.max(1.2, size * 0.035);
+  context.lineCap = "round";
+  context.beginPath();
+  context.moveTo(centerX - size * 0.34 * lineProgress, centerY);
+  context.lineTo(centerX + size * 0.34 * lineProgress, centerY);
+  context.stroke();
+  context.restore();
+}
+
+function drawSlashBeam(context, effect, cell, normalColumns, laneGap) {
+  const progress = Math.min(effect.elapsed / effect.duration, 1);
+  const source = getEffectCellCenter(effect.x, effect.y, cell, normalColumns, laneGap);
+  const targets = effect.targets.map((target) => getEffectCellCenter(target.x, target.y, cell, normalColumns, laneGap));
+  const exit = getSlashExitPoint(context, targets.at(-1) ?? source, cell);
+  const points = [source, ...targets, exit];
+  const segments = getPathSegments(points);
+  const totalLength = segments.reduce((sum, segment) => sum + segment.length, 0);
+  const headLength = totalLength * easeInQuad(progress);
+  const bladeLength = Math.max(cell * 2.15, 96);
+  const tailLength = Math.max(0, headLength - bladeLength);
+  const alpha = progress < 0.82 ? 1 : Math.max(0, 1 * (1 - (progress - 0.82) / 0.18));
+
+  context.save();
+  context.strokeStyle = effect.color;
+  context.globalAlpha = alpha;
+  context.lineWidth = Math.max(1.4, cell * 0.026);
+  context.lineCap = "round";
+  context.lineJoin = "round";
+  context.beginPath();
+  drawPathSegment(context, segments, tailLength, headLength);
+  context.stroke();
+  context.restore();
+
+}
+
+function getSlashExitPoint(context, lastTarget, cell) {
+  return {
+    x: context.canvas.width + cell * 0.35,
+    y: lastTarget.y,
+  };
+}
+
+function getEffectCellCenter(x, y, cell, normalColumns, laneGap) {
+  const left = x * cell + (x >= normalColumns ? laneGap : 0);
+  return {
+    x: left + cell / 2,
+    y: y * cell + cell / 2,
+  };
+}
+
+function getPathSegments(points) {
+  return points.slice(1).map((point, index) => {
+    const from = points[index];
+    const length = Math.hypot(point.x - from.x, point.y - from.y);
+    return { from, to: point, length };
+  });
+}
+
+function drawPathSegment(context, segments, startLength, endLength) {
+  if (!segments.length) return;
+
+  let traveled = 0;
+  let hasStarted = false;
+  for (const segment of segments) {
+    const segmentStart = traveled;
+    const segmentEnd = traveled + segment.length;
+    traveled = segmentEnd;
+
+    if (endLength <= segmentStart) return;
+    if (startLength >= segmentEnd) continue;
+
+    const fromAmount = Math.max(0, (startLength - segmentStart) / segment.length);
+    const toAmount = Math.min(1, (endLength - segmentStart) / segment.length);
+    const from = interpolatePoint(segment.from, segment.to, fromAmount);
+    const to = interpolatePoint(segment.from, segment.to, toAmount);
+
+    if (!hasStarted) {
+      context.moveTo(from.x, from.y);
+      hasStarted = true;
+    } else {
+      context.lineTo(from.x, from.y);
+    }
+    context.lineTo(to.x, to.y);
+  }
+}
+
+function interpolatePoint(from, to, amount) {
+  return {
+    x: from.x + (to.x - from.x) * amount,
+    y: from.y + (to.y - from.y) * amount,
+  };
+}
+
+function easeOutCubic(value) {
+  return 1 - (1 - value) ** 3;
+}
+
+function easeInQuad(value) {
+  return value * value;
 }
 
 function drawCornerMarks(context, left, top, size, block, color = getCornerColor(block)) {

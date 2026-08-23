@@ -8,7 +8,7 @@ import {
   rotate,
   skipMerchant,
   togglePause,
-} from "../core/game.js?v=20260821-52";
+} from "../core/game.js?v=20260822-14";
 
 export function bindInput(getGame, setGame, onChange) {
   window.addEventListener("keydown", (event) => {

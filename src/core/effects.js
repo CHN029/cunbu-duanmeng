@@ -1,10 +1,10 @@
-import { EFFECT_MS } from "./config.js?v=20260821-40";
+import { EFFECT_MS } from "./config.js?v=20260822-9";
 
 export function addEffect(game, effect) {
   game.effects.push({
     ...effect,
     elapsed: -(effect.delay ?? 0),
-    duration: EFFECT_MS,
+    duration: effect.duration ?? EFFECT_MS,
   });
 }
 

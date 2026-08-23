@@ -6,7 +6,7 @@ import {
   NO_MONSTER_ROUND_CHANCE,
   ONE_MONSTER_AFTER_SPAWN_CHANCE,
   RUN_LENGTH,
-} from "./config.js?v=20260821-40";
+} from "./config.js?v=20260822-9";
 
 export function createRun(roundCount = RUN_LENGTH) {
   return {

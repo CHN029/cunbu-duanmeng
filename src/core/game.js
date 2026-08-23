@@ -1,8 +1,10 @@
-import { collides, createBoard, isNormalBottomRowFull, rotatePiece, settleBoard, shiftPiece } from "./board.js?v=20260821-30";
+import { collides, createBoard, isNormalBottomRowFull, rotatePiece, settleBoard, settleBoardColumns, shiftPiece } from "./board.js?v=20260822-2";
 import {
+  BOARD_SETTLE_ANIMATION_MS,
   BOARD_HEIGHT,
   BOARD_WIDTH,
   DROP_MS,
+  ENCOUNTER_GATE_EXIT_MS,
   HEAVY_ARMOR_BLOCK_BONUS,
   INITIAL_BODY,
   INITIAL_MAX_BODY,
@@ -11,14 +13,15 @@ import {
   MERCHANT_SKIP_COST,
   MONSTER_START_X,
   NORMAL_COLUMNS,
+  SLAY_MARK_FADE_MS,
   SHARPEN_SWORD_SKILL_GAIN,
   TEMPER_BODY_BODY_GAIN,
   TEMPER_BODY_MAX_BODY_GAIN,
-} from "./config.js?v=20260821-40";
-import { clearEncounter, startEncounter, updateEncounter as updateEncounterState } from "./encounterOrchestrator.js?v=20260821-39";
+} from "./config.js?v=20260822-9";
+import { clearEncounter, startEncounter, updateEncounter as updateEncounterState } from "./encounterOrchestrator.js?v=20260822-15";
 import { canSkipMerchant, createMerchant, isModifierBlessing, moveMerchantSelectionIndex, shouldOpenMerchant } from "./merchant.js?v=20260821-46";
-import { createMonsterPiece, createNormalPiece } from "./pieces.js?v=20260821-30";
-import { createRun, getNextRound, peekUpcomingBlocks } from "./runOrchestrator.js?v=20260821-30";
+import { createMonsterPiece, createNormalPiece } from "./pieces.js?v=20260822-1";
+import { createRun, getNextRound, peekUpcomingBlocks } from "./runOrchestrator.js?v=20260822-1";
 
 export function createGame() {
   const game = {
@@ -46,8 +49,12 @@ export function createGame() {
     paused: false,
     runComplete: false,
     encounter: null,
+    encounterGate: null,
+    settleGate: null,
     effects: [],
     uiEffects: [],
+    gravityAnimations: [],
+    exitAnimations: [],
     merchant: null,
   };
 
@@ -60,14 +67,14 @@ export function getUpcomingBlocks(game, count = 6) {
 }
 
 export function tick(game) {
-  if (game.paused || game.gameOver || game.runComplete || game.encounter || game.merchant) return;
+  if (isBoardTransitioning(game) || game.paused || game.gameOver || game.runComplete || game.encounter || game.merchant) return;
 
   dropActive(game, "normal");
   finishRoundIfSettled(game);
 }
 
 export function tickMonsters(game) {
-  if (game.paused || game.gameOver || game.runComplete || game.encounter || game.merchant || !game.active.monsters) return false;
+  if (isAdvanceTransitioning(game) || game.paused || game.gameOver || game.runComplete || game.encounter || game.merchant || !game.active.monsters) return false;
 
   const moved = dropActive(game, "monsters");
   finishRoundIfSettled(game);
@@ -75,7 +82,7 @@ export function tickMonsters(game) {
 }
 
 export function canMove(game, dx, dy) {
-  if (game.paused || game.gameOver || game.runComplete || game.encounter || game.merchant || !game.active.normal) return false;
+  if (isBoardTransitioning(game) || game.paused || game.gameOver || game.runComplete || game.encounter || game.merchant || !game.active.normal) return false;
 
   const next = shiftPiece(game.active.normal, dx, dy);
   return !collides(game.board, next, 0, NORMAL_COLUMNS - 1);
@@ -86,7 +93,7 @@ export function hasActiveMonsters(game) {
 }
 
 export function canMonstersDrop(game) {
-  if (game.paused || game.gameOver || game.runComplete || game.encounter || game.merchant || !game.active.monsters) return false;
+  if (isAdvanceTransitioning(game) || game.paused || game.gameOver || game.runComplete || game.encounter || game.merchant || !game.active.monsters) return false;
 
   return game.active.monsters.blocks.some((block) => {
     const next = {
@@ -99,15 +106,18 @@ export function canMonstersDrop(game) {
 }
 
 function finishRoundIfSettled(game) {
+  if (game.settleGate || game.gravityAnimations.length) return;
+
   if (!game.active.normal && !game.active.monsters) {
-    settleBoard(game.board);
-    if (isNormalBottomRowFull(game.board)) {
-      startEncounter(game);
-    } else if (shouldOpenMerchant(game)) {
-      openMerchant(game);
-    } else {
-      spawnRound(game);
+    const movements = settleBoard(game.board);
+
+    if (movements.length) {
+      game.gravityAnimations = movements;
+      game.settleGate = { resumeAfter: true };
+      return;
     }
+
+    continueAfterSettling(game);
   }
 }
 
@@ -120,7 +130,7 @@ export function move(game, dx, dy) {
 }
 
 export function rotate(game) {
-  if (game.paused || game.gameOver || game.runComplete || game.merchant || !game.active.normal) return false;
+  if (isBoardTransitioning(game) || game.paused || game.gameOver || game.runComplete || game.merchant || !game.active.normal) return false;
   if (game.active.normal.blocks.length < 2) return false;
 
   const next = rotatePiece(game.active.normal);
@@ -131,7 +141,7 @@ export function rotate(game) {
 }
 
 export function hardDrop(game) {
-  if (game.paused || game.gameOver || game.runComplete || game.encounter || game.merchant) return;
+  if (isBoardTransitioning(game) || game.paused || game.gameOver || game.runComplete || game.encounter || game.merchant) return;
 
   while (move(game, 0, 1)) {
     continue;
@@ -150,6 +160,69 @@ export function updateEncounter(game, delta) {
   if (game.paused) return;
 
   if (updateEncounterState(game, delta)) finishEncounter(game);
+}
+
+export function updateBoardAnimations(game, delta) {
+  updateDamageReveals(game, delta);
+
+  if (game.encounterGate) {
+    game.encounterGate.elapsed += delta;
+    if (game.encounterGate.elapsed >= game.encounterGate.duration) {
+      const shouldResume = game.encounterGate.resumeAfter;
+      game.encounterGate = null;
+      if (shouldResume) continueAfterEncounter(game);
+    }
+  }
+
+  game.exitAnimations.forEach((animation) => {
+    animation.elapsed = (animation.elapsed ?? 0) + delta;
+    animation.duration = animation.duration ?? BOARD_SETTLE_ANIMATION_MS;
+  });
+  game.exitAnimations = game.exitAnimations.filter((animation) => animation.elapsed < animation.duration);
+
+  if (game.gravityAnimations.length) {
+    game.gravityAnimations.forEach((animation) => {
+      animation.elapsed = (animation.elapsed ?? 0) + delta;
+      animation.duration = animation.duration ?? BOARD_SETTLE_ANIMATION_MS;
+    });
+    game.gravityAnimations = game.gravityAnimations.filter((animation) => animation.elapsed < animation.duration);
+  }
+
+  if (!game.gravityAnimations.length && !game.exitAnimations.length && game.settleGate) {
+    const shouldResume = game.settleGate.resumeAfter;
+    game.settleGate = null;
+    if (shouldResume) continueAfterSettling(game);
+  }
+}
+
+function updateDamageReveals(game, delta) {
+  game.board.forEach((row) => {
+    row.forEach((block) => {
+      if (!block?.damageReveal) return;
+
+      block.damageReveal.elapsed += delta;
+      if (block.damageReveal.elapsed >= block.damageReveal.delay) {
+        delete block.damageReveal;
+        if (block.slayed) {
+          block.slayMark = {
+            elapsed: 0,
+            duration: SLAY_MARK_FADE_MS,
+          };
+        }
+      }
+    });
+  });
+
+  game.board.forEach((row) => {
+    row.forEach((block) => {
+      if (!block?.slayMark) return;
+
+      block.slayMark.elapsed += delta;
+      if (block.slayMark.elapsed >= block.slayMark.duration) {
+        delete block.slayMark;
+      }
+    });
+  });
 }
 
 export function chooseMerchantOption(game, index) {
@@ -273,11 +346,30 @@ function lockActive(game, lane) {
   });
 
   game.active[lane] = null;
+
+  if (lane === "normal") settleNormalColumns(game);
 }
 
 function finishEncounter(game) {
   clearEncounter(game);
+  game.encounterGate = {
+    phase: "opening",
+    elapsed: 0,
+    duration: ENCOUNTER_GATE_EXIT_MS,
+    resumeAfter: true,
+  };
+}
 
+function continueAfterEncounter(game) {
+  if (game.gravityAnimations.length || game.exitAnimations.length) {
+    game.settleGate = { resumeAfter: true };
+    return;
+  }
+
+  continueAfterSettling(game);
+}
+
+function continueAfterSettling(game) {
   if (game.gameOver) return;
 
   if (isNormalBottomRowFull(game.board)) {
@@ -287,6 +379,22 @@ function finishEncounter(game) {
   } else {
     spawnRound(game);
   }
+}
+
+function isBoardTransitioning(game) {
+  return Boolean(game.encounterGate || game.settleGate || game.gravityAnimations.length || game.exitAnimations.length);
+}
+
+function isAdvanceTransitioning(game) {
+  return Boolean(game.encounterGate || game.settleGate);
+}
+
+function settleNormalColumns(game) {
+  const movements = settleBoardColumns(game.board, 0, NORMAL_COLUMNS - 1);
+  if (!movements.length) return;
+
+  game.gravityAnimations = movements;
+  if (!game.active.monsters) game.settleGate = { resumeAfter: true };
 }
 
 function openMerchant(game, resumeWithNewRound = true, preview = false) {

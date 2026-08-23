@@ -1,4 +1,4 @@
-import { MERCHANT_OPTION_COUNT, MERCHANT_SKIP_COST, MERCHANT_THRESHOLD } from "./config.js?v=20260821-40";
+import { MERCHANT_OPTION_COUNT, MERCHANT_SKIP_COST, MERCHANT_THRESHOLD } from "./config.js?v=20260822-9";
 
 export const MERCHANT_OPTIONS = [
   { id: "renewal", label: "回春", description: "體魄復滿", path: "general", category: "instant" },

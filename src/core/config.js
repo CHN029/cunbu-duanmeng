@@ -28,11 +28,62 @@ export const MONSTER_FALL_STEP_ANIMATION_MS = 115;
 // Milliseconds each encounter event stays visible before applying.
 export const ENCOUNTER_STEP_MS = 380;
 
+// Milliseconds to hold after a simple encounter effect applies.
+export const ENCOUNTER_MINOR_EFFECT_WAIT_MS = 160;
+
+// Milliseconds to pause on a focused bottom row before encounter resolution starts.
+export const ENCOUNTER_INTRO_MS = 450;
+
+// Milliseconds used for the encounter gate line to retreat after resolution.
+export const ENCOUNTER_GATE_EXIT_MS = 360;
+
+// Milliseconds used to animate settled board blocks falling into newly opened gaps.
+export const BOARD_SETTLE_ANIMATION_MS = 180;
+
 // Milliseconds floating glyph effects stay alive.
 export const EFFECT_MS = 520;
 
+// Milliseconds slash blade-line effects stay alive.
+export const SLASH_BEAM_EFFECT_MS = 260;
+
+// Milliseconds after the slash line starts before monster damage is revealed.
+export const SLASH_DAMAGE_REVEAL_DELAY_MS = SLASH_BEAM_EFFECT_MS + 180;
+
+// Milliseconds used for the red slain mark to fade onto a cut monster.
+export const SLAY_MARK_FADE_MS = 180;
+
+// Whether slain monsters can trigger 奪 loot rewards after slash damage.
+export const SLASH_LOOT_ENABLED = false;
+
 // Milliseconds to wait before showing 奪 after a monster slay effect starts.
 export const LOOT_EFFECT_DELAY_MS = 260;
+
+// Milliseconds to hold after a slay so 斬 and possible 奪 can read as one event.
+export const ENCOUNTER_SLAY_EFFECT_WAIT_MS = EFFECT_MS + LOOT_EFFECT_DELAY_MS + 80;
+
+// Milliseconds to hold after attack effects without loot.
+export const ENCOUNTER_ATTACK_EFFECT_WAIT_MS = SLASH_DAMAGE_REVEAL_DELAY_MS + SLAY_MARK_FADE_MS + 120;
+
+// Milliseconds stat-change glyphs travel before disappearing.
+export const UI_EFFECT_MS = 520;
+
+// Milliseconds before a traveling glyph applies its stat change.
+export const UI_EFFECT_APPLY_MS = 420;
+
+// Milliseconds between support glyph launches in the same encounter category.
+export const UI_EFFECT_STAGGER_MS = 85;
+
+// Milliseconds stat-shake effects stay visible.
+export const UI_SHAKE_MS = 420;
+
+// Milliseconds stat expansion effects stay visible.
+export const UI_EXPAND_MS = 440;
+
+// Milliseconds to hold after a stat-changing encounter block resolves.
+export const ENCOUNTER_UI_EFFECT_WAIT_MS = UI_EFFECT_MS + 80;
+
+// Milliseconds to hold after a monster attack resolves.
+export const ENCOUNTER_DAMAGE_EFFECT_WAIT_MS = UI_SHAKE_MS + 80;
 
 // Number of pregenerated rounds in a full run.
 export const RUN_LENGTH = 80;

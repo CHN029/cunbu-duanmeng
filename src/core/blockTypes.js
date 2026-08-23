@@ -1,4 +1,4 @@
-import { ARMOR_BLOCK_VALUE, BANDIT_VALUE, GENERAL_VALUE, GHOST_VALUE } from "./config.js?v=20260821-40";
+import { ARMOR_BLOCK_VALUE, BANDIT_VALUE, GENERAL_VALUE, GHOST_VALUE } from "./config.js?v=20260822-9";
 
 export const BLOCK_TYPES = {
   B: { label: "藥", name: "Medicine", lane: "normal" },
