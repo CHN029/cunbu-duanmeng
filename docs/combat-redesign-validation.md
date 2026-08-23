@@ -9,12 +9,12 @@ This pass replaces the previous delayed Doom wager with the finite Curse chain d
 - `斬` damage is calculated through `src/core/combatRules.js`.
 - Ordinary `斬` has intrinsic damage, independent of Sword blessings.
 - `磨鋒` gives a bounded Sword blessing bonus instead of uncapped common-block growth.
-- `勢` converts one `斬` into `必殺`; each `必殺` slays one front monster.
+- `機` converts one `斬` into `必殺`; each `必殺` slays one front monster.
 - `甲` adds capped persistent Guard on the player.
-- `咒` creates one finite chain: pending Curse, Cursed Monster, future Cursed Slash, then end.
+- `呪` creates one finite chain: pending Curse, Cursed Monster, reward-or-attack, then end.
 - A Cursed Monster gains +1 value directly; there is no separate Doom attack bonus.
 - Slaying a Cursed Monster creates exactly one future Cursed Slash with +1 damage.
-- Additional `咒` blocks are deterministically replaced by `斬` while a Curse chain is active.
+- Additional `呪` blocks fade without starting a second Curse chain while a Curse chain is active.
 
 ## Rule Scenarios
 
@@ -22,12 +22,12 @@ This pass replaces the previous delayed Doom wager with the finite Curse chain d
 
 - `劍` has 0% normal generation weight.
 - One ordinary `斬` slays a tier-1 monster.
-- `勢` converts one `斬` into a front-monster kill, while remaining ordinary Slash damage still
+- `機` converts one `斬` into a front-monster kill, while remaining ordinary Slash damage still
   affects the next monster.
 - `甲` adds Guard in an empty encounter.
 - `甲` protects against monster damage even when UI effects are not advanced.
-- `咒` remains pending through an empty encounter.
-- `咒` created in a monster encounter does not affect that encounter's monster.
+- `呪` remains pending through an empty encounter.
+- `呪` created in a monster encounter does not affect that encounter's monster.
 - Pending Curse attaches to the front monster, increases value by 1, and does not attach to the
   second monster first.
 - A surviving Cursed Monster attacks with its remaining value and ends the chain without reward.
@@ -46,7 +46,7 @@ future encounters. Slash remains better when the current row contains threats th
 removed immediately.
 
 Curse now asks the player to prepare for a later harder monster in exchange for one stronger Slash
-afterward. A `咒` created in the current encounter waits for a later encounter, so it cannot
+afterward. A `呪` created in the current encounter waits for a later encounter, so it cannot
 retroactively change the monster already committed in that row. The reward is explicitly
 future-facing; it cannot empower the same encounter that earned it.
 
@@ -63,7 +63,7 @@ intrinsic Slash damage and Momentum one-hit kills, so basic combat does not depe
 - Ordinary Slash intrinsic damage: 1.
 - Sword blessing cap: 2.
 - Guard cap: 6.
-- Momentum: one `必殺` per `勢`.
+- Opening: one `必殺` per `機`.
 - Cursed Monster value bonus: +1.
 - Cursed Slash damage bonus: +1.
 - `連斬`: currently bounded to +1 local Slash damage when more than one `斬` is present.
@@ -73,7 +73,7 @@ intrinsic Slash damage and Momentum one-hit kills, so basic combat does not depe
 - Removed `pendingDoom` player state.
 - Removed `CURSE_BLOCK_DOOM_GAIN`, `DOOM_REWARD_TREASURE_GAIN`, and the old Doom attack/reward
   resolution path.
-- Removed Doom labels from the panel; the panel now shows `咒` while a future monster curse is pending.
+- Removed Doom labels from the panel; the panel now shows `呪` while a future monster curse is pending.
 - Removed the treasure reward for killing all cursed/applicable monsters.
 
 ## Known Follow-Up
@@ -81,4 +81,4 @@ intrinsic Slash damage and Momentum one-hit kills, so basic combat does not depe
 - Add more deterministic tests around cascaded encounters and future-run marking.
 - Review whether `磨鋒` should stack to cap, upgrade, or be excluded once capped.
 - Review whether `連斬` should remain as a bounded modifier or become a different Sword blessing.
-- Review whether active-chain `咒 -> 斬` replacement is the right deterministic suppression rule.
+- Review whether active-chain `呪` fading is the right deterministic suppression rule.

@@ -1,6 +1,6 @@
-import { drawMerchant } from "./merchantRenderer.js?v=20260822-1";
-import { getEncounterEvents, getSlashDamage as getResolvedSlashDamage, isInstantSlashEvent } from "../core/combatRules.js?v=20260822-5";
-import { COLORS } from "../theme/colors.js?v=20260821-16";
+import { drawMerchant } from "./merchantRenderer.js?v=20260822-2";
+import { getEncounterEvents, getSlashDamage as getResolvedSlashDamage, isInstantSlashEvent } from "../core/combatRules.js?v=20260822-7";
+import { COLORS } from "../theme/colors.js?v=20260821-19";
 
 export function createCanvasRenderer(canvas) {
   const context = canvas.getContext("2d");
@@ -137,9 +137,10 @@ function getBlockYOffset(game, block, yOffset) {
 }
 
 function drawCell(context, x, y, cell, block, normalColumns, laneGap, game, visual = {}) {
-  const left = x * cell + (x >= normalColumns ? laneGap : 0);
+  const shake = getHitShakeOffset(block, cell);
+  const left = x * cell + (x >= normalColumns ? laneGap : 0) + shake.x;
   const animatedY = getSettledBlockY(game, block, y);
-  const top = animatedY * cell;
+  const top = animatedY * cell + shake.y;
   const size = cell;
   const isMonster = block.lane === "monster";
   const opacity = visual.opacity ?? getBoardBlockOpacity(game, block, x, y);
@@ -169,6 +170,19 @@ function drawCell(context, x, y, cell, block, normalColumns, laneGap, game, visu
   context.restore();
 }
 
+function getHitShakeOffset(block, cell) {
+  if (!block?.hitShake) return { x: 0, y: 0 };
+
+  const progress = Math.min(block.hitShake.elapsed / block.hitShake.duration, 1);
+  const strength = cell * 0.085 * (1 - progress);
+  const wave = Math.sin(progress * Math.PI * 8);
+
+  return {
+    x: wave * strength,
+    y: Math.sin(progress * Math.PI * 5) * strength * 0.35,
+  };
+}
+
 function drawBlockGlyph(context, left, top, size, block, game, x, y, isMonster) {
   context.fillStyle = getGlyphColor(block);
   context.textAlign = "center";
@@ -179,7 +193,7 @@ function drawBlockGlyph(context, left, top, size, block, game, x, y, isMonster) 
       const progress = Math.min(block.curseRevealFade.elapsed / block.curseRevealFade.duration, 1);
       drawGlyphMorph(context, {
         from: block.label,
-        to: "煞",
+        to: "鬼",
         x: left + size / 2,
         y: top + size * 0.5,
         size,
@@ -190,7 +204,7 @@ function drawBlockGlyph(context, left, top, size, block, game, x, y, isMonster) 
       return;
     }
     context.font = `400 ${Math.floor(size * 0.7)}px "Huiwen-Fangsong", "STFangsong", "Songti TC", serif`;
-    context.fillText("煞", left + size / 2, top + size * 0.5);
+    context.fillText("鬼", left + size / 2, top + size * 0.5);
     return;
   }
 
@@ -214,6 +228,10 @@ function drawBlockGlyph(context, left, top, size, block, game, x, y, isMonster) 
   }
 
   context.font = `400 ${Math.floor(size * 0.7)}px "Huiwen-Fangsong", "STFangsong", "Songti TC", serif`;
+  if (block.label.length > 1) {
+    drawCompressedVerticalGlyph(context, block.label, left + size / 2, top + size * 0.5, size * 0.68, 0.5, 1);
+    return;
+  }
   context.fillText(block.label, left + size / 2, top + size * getGlyphCenterY(block));
 }
 
@@ -411,7 +429,7 @@ function shouldShowSlashCharge(encounter, event) {
 }
 
 function hasTravelingSupportGlyph(event) {
-  return ["B", "C", "D", "T", "E"].includes(event.block.type);
+  return ["B", "C", "T", "E"].includes(event.block.type);
 }
 
 function drawMonsterAttackShadow(context, left, top, size, block, progress) {
@@ -667,7 +685,6 @@ function getCornerColor(block) {
   if (!block) return COLORS.corners.grid;
   if (isVisibleCursedMonster(block)) return COLORS.corners.curse;
   if (block.type === "B") return COLORS.corners.heal;
-  if (block.type === "D") return COLORS.corners.sword;
   if (block.type === "L") return COLORS.corners.slash;
   if (block.type === "C") return COLORS.corners.curse;
   if (block.type === "T") return COLORS.corners.treasure;
@@ -698,7 +715,7 @@ function drawOverlay(context, canvas, game) {
   context.fillStyle = COLORS.overlay;
   context.fillRect(0, 0, canvas.width, canvas.height);
 
-  const label = game.gameOver ? "折戟沉沙" : game.runComplete ? "斬將搴旗" : "屏息待機";
+  const label = game.gameOver ? "折戟沉沙" : game.runComplete ? "克敵制勝" : "按兵不動";
   drawVerticalLabel(context, canvas, label);
 }
 

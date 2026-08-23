@@ -7,6 +7,7 @@ import {
   DROP_MS,
   ENCOUNTER_GATE_EXIT_MS,
   HEAVY_ARMOR_BLOCK_BONUS,
+  INSTANT_SLASH_REVEAL_MS,
   INITIAL_BODY,
   INITIAL_GUARD,
   INITIAL_MAX_BODY,
@@ -20,11 +21,11 @@ import {
   SHARPEN_SWORD_SKILL_GAIN,
   TEMPER_BODY_BODY_GAIN,
   TEMPER_BODY_MAX_BODY_GAIN,
-} from "./config.js?v=20260822-20";
-import { clearEncounter, startEncounter, updateEncounter as updateEncounterState } from "./encounterOrchestrator.js?v=20260822-31";
+} from "./config.js?v=20260822-24";
+import { clearEncounter, startEncounter, updateEncounter as updateEncounterState } from "./encounterOrchestrator.js?v=20260822-39";
 import { canSkipMerchant, createMerchant, isModifierBlessing, moveMerchantSelectionIndex, shouldOpenMerchant } from "./merchant.js?v=20260822-1";
 import { createMonsterPiece, createNormalPiece } from "./pieces.js?v=20260822-1";
-import { createRun, getNextRound, peekUpcomingBlocks } from "./runOrchestrator.js?v=20260822-1";
+import { createRun, getNextRound, peekUpcomingBlocks } from "./runOrchestrator.js?v=20260822-4";
 
 export function createGame() {
   const game = {
@@ -172,6 +173,7 @@ export function updateBoardAnimations(game, delta) {
   updateDamageReveals(game, delta);
   updateCurseReveals(game, delta);
   updateInstantReveals(game, delta);
+  updateHitShakes(game, delta);
 
   if (game.encounterGate) {
     game.encounterGate.elapsed += delta;
@@ -201,6 +203,19 @@ export function updateBoardAnimations(game, delta) {
     game.settleGate = null;
     if (shouldResume) continueAfterSettling(game);
   }
+}
+
+function updateHitShakes(game, delta) {
+  game.board.forEach((row) => {
+    row.forEach((block) => {
+      if (!block?.hitShake) return;
+
+      block.hitShake.elapsed += delta;
+      if (block.hitShake.elapsed >= block.hitShake.duration) {
+        delete block.hitShake;
+      }
+    });
+  });
 }
 
 function updateCurseReveals(game, delta) {
@@ -420,6 +435,7 @@ function lockActive(game, lane) {
   game.active[lane] = null;
 
   if (lane === "normal") settleNormalColumns(game);
+  pairMomentumWithSlashRows(game);
 }
 
 function finishEncounter(game) {
@@ -444,6 +460,8 @@ function continueAfterEncounter(game) {
 function continueAfterSettling(game) {
   if (game.gameOver) return;
 
+  pairMomentumWithSlashRows(game);
+
   if (isNormalBottomRowFull(game.board)) {
     startEncounter(game);
   } else if (shouldOpenMerchant(game)) {
@@ -451,6 +469,27 @@ function continueAfterSettling(game) {
   } else {
     spawnRound(game);
   }
+}
+
+function pairMomentumWithSlashRows(game) {
+  game.board.forEach((row) => {
+    const availableMomentums = row
+      .slice(0, NORMAL_COLUMNS)
+      .filter((block) => block?.type === "O" && !block.instantSlashSpent);
+    const availableSlashes = row
+      .slice(0, NORMAL_COLUMNS)
+      .filter((block) => block?.type === "L" && !block.instantSlash);
+
+    const pairCount = Math.min(availableMomentums.length, availableSlashes.length);
+    for (let index = 0; index < pairCount; index += 1) {
+      availableMomentums[index].instantSlashSpent = true;
+      availableSlashes[index].instantSlash = true;
+      availableSlashes[index].instantRevealFade = {
+        elapsed: 0,
+        duration: INSTANT_SLASH_REVEAL_MS,
+      };
+    }
+  });
 }
 
 function isBoardTransitioning(game) {

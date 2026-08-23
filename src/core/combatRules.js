@@ -1,4 +1,4 @@
-import { CHAIN_SLASH_DAMAGE_PER_SLASH, MAX_CHAIN_SLASH_BONUS, SLASH_INTRINSIC_DAMAGE } from "./config.js?v=20260822-19";
+import { CHAIN_SLASH_DAMAGE_PER_SLASH, MAX_CHAIN_SLASH_BONUS, SLASH_INTRINSIC_DAMAGE } from "./config.js?v=20260822-24";
 
 export function getSlashDamage(game, encounter = game.encounter, slashBlock = null) {
   return SLASH_INTRINSIC_DAMAGE + getLocalSlashBonus(game, encounter) + getSwordBlessingBonus(game);
@@ -16,13 +16,7 @@ export function getSwordBlessingBonus(game) {
 }
 
 export function isInstantSlashEvent(encounter, event) {
-  if (!encounter || event?.block?.type !== "L" || (encounter.instantSlashCount ?? 0) <= 0) return false;
-
-  const slashEvents = getEncounterEvents(encounter)
-    .filter((item) => item?.type === "normal" && item.block.type === "L")
-    .sort((a, b) => a.x - b.x);
-  const index = slashEvents.findIndex((item) => item.block === event.block && item.x === event.x && item.y === event.y);
-  return index >= 0 && index < encounter.instantSlashCount;
+  return Boolean(event?.block?.type === "L" && event.block.instantSlash);
 }
 
 export function getEncounterEvents(encounter) {

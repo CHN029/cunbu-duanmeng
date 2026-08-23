@@ -6,7 +6,7 @@ import {
   MONSTER_DROP_MS,
   MONSTER_FALL_STEP_ANIMATION_MS,
   NORMAL_COLUMNS,
-} from "./core/config.js?v=20260822-20";
+} from "./core/config.js?v=20260822-24";
 import {
   canMonstersDrop,
   canMove,
@@ -21,10 +21,10 @@ import {
   updateBoardAnimations,
   togglePause,
   updateEncounter,
-} from "./core/game.js?v=20260822-28";
-import { createCanvasRenderer } from "./renderers/canvasRenderer.js?v=20260822-83";
-import { COLORS } from "./theme/colors.js?v=20260821-16";
-import { bindInput, bindSwipeInput } from "./ui/input.js?v=20260821-51";
+} from "./core/game.js?v=20260822-40";
+import { createCanvasRenderer } from "./renderers/canvasRenderer.js?v=20260822-92";
+import { COLORS } from "./theme/colors.js?v=20260821-19";
+import { bindInput, bindSwipeInput } from "./ui/input.js?v=20260821-53";
 import { toChineseNumber } from "./ui/chineseNumbers.js?v=20260821-1";
 import { updateUiEffects } from "./core/uiEffects.js?v=20260822-4";
 
@@ -33,7 +33,6 @@ const canvas = document.querySelector("#game");
 const upcoming = document.querySelector("#upcoming");
 const round = document.querySelector("#round");
 const bodyMeter = document.querySelector("#body-meter");
-const sword = document.querySelector("#sword");
 const treasure = document.querySelector("#treasure");
 const blessings = document.querySelector("#blessings");
 const newRun = document.querySelector("#new-run");
@@ -50,7 +49,6 @@ let dropCounter = 0;
 let monsterDropCounter = 0;
 let upcomingKey = "";
 const rollingStats = {
-  sword: createRollingStat(),
   treasure: createRollingStat(),
 };
 
@@ -116,16 +114,16 @@ function render() {
     return;
   }
 
+  document.body.classList.remove("is-idle");
   const running = !game.paused && !game.gameOver && !game.runComplete && !game.encounterGate && !game.merchant;
   const normalDropProgress = running && !game.encounter && canMove(game, 0, 1) ? getStepDropProgress(dropCounter) : 0;
   const monsterDropProgress = running && !game.encounter && canMonstersDrop(game) ? getMonsterStepDropProgress(monsterDropCounter) : 0;
 
   renderer.draw(game, { normalDropProgress, monsterDropProgress });
-  round.textContent = `第${toChineseNumber(Math.min(game.run.currentRound, game.run.totalRounds))}回合`;
+  round.textContent = `第${toChineseNumber(Math.min(game.run.currentRound, game.run.totalRounds))}回`;
   newRun.textContent = "週而復始";
   renderBodyMeter();
-  renderRollingStat(sword, rollingStats.sword, game.player.swordSkill);
-  renderRollingStat(treasure, rollingStats.treasure, game.player.treasure);
+  renderRollingStat(treasure, rollingStats.treasure, getVisibleTreasure());
   renderUpcoming();
   renderBlessings();
   renderUiEffects();
@@ -134,11 +132,11 @@ function render() {
 }
 
 function renderIdle() {
+  document.body.classList.add("is-idle");
   renderer.drawIdle({ width: BOARD_WIDTH, height: BOARD_HEIGHT, normalColumns: NORMAL_COLUMNS });
-  round.textContent = "未開局";
+  round.textContent = "第一回";
   renderBodyDots(INITIAL_MAX_BODY, 0);
   resetRollingStats();
-  sword.textContent = "無";
   treasure.textContent = "無";
   upcomingKey = "";
   upcoming.replaceChildren(...Array.from({ length: 6 }, () => {
@@ -149,7 +147,7 @@ function renderIdle() {
   blessings.replaceChildren();
   uiEffects.replaceChildren();
   renderPanelEffects();
-  newRun.textContent = "開局";
+  newRun.textContent = "週而復始";
   renderPauseButton();
 }
 
@@ -198,7 +196,7 @@ function renderBlessings() {
   blessings.replaceChildren(
     ...tags.map((label) => {
       const tag = document.createElement("span");
-      tag.className = `blessing-tag${label.startsWith("咒") ? " curse-tag" : ""}`;
+      tag.className = `blessing-tag${label.startsWith("呪") ? " curse-tag" : ""}`;
       tag.textContent = label;
       return tag;
     }),
@@ -396,6 +394,13 @@ function renderRollingText(element, state, direction) {
   state.lastRendered = state.display;
 }
 
+function getVisibleTreasure() {
+  const deferredTreasure = game.uiEffects
+    .filter((effect) => effect.deferPanelStat === "treasure")
+    .reduce((sum, effect) => sum + (effect.amount ?? 0), 0);
+  return game.player.treasure - deferredTreasure;
+}
+
 function resetRollingStats() {
   Object.values(rollingStats).forEach((state) => {
     state.from = null;
@@ -410,7 +415,6 @@ function getTargetCenter(target) {
   const element = {
     body: bodyMeter,
     curse: blessings,
-    sword,
     treasure,
     upcoming,
   }[target];
@@ -444,7 +448,7 @@ function getBlessingStacks(labels) {
 function getCurseTag(curseChain) {
   if (!curseChain || curseChain.phase === "inactive") return "";
   if (hasActiveUiEffect("curse", "travel")) return "";
-  if (curseChain.phase === "pendingMonster") return "咒";
+  if (curseChain.phase === "pendingMonster") return "呪";
   return "";
 }
 
@@ -476,7 +480,6 @@ function renderUpcoming() {
 function getBlockCornerColor(block) {
   if (block.cursedMonster) return COLORS.corners.curse;
   if (block.type === "B") return COLORS.corners.heal;
-  if (block.type === "D") return COLORS.corners.sword;
   if (block.type === "L") return COLORS.corners.slash;
   if (block.type === "C") return COLORS.corners.curse;
   if (block.type === "T") return COLORS.corners.treasure;

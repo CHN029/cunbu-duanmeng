@@ -12,9 +12,9 @@
   --panel: #ffffff;
   --line: #bdbdbd;
   --accent: #333333;
-  --red-heart: #b33a3a;
+  --red-heart: #a30636;
   --shield-blue: #5f7fa8;
-  --curse-blue: #4f78b7;
+  --curse-blue: #0057ba;
 }
 
 * {
@@ -48,7 +48,7 @@ body {
   top: 0;
   font-family: "Huiwen-Fangsong", "STFangsong", "Songti TC", serif;
   font-size: 1.72rem;
-  font-weight: 500;
+  font-weight: 400;
   line-height: 1;
   will-change: transform, opacity;
 }
@@ -113,7 +113,7 @@ body {
 }
 
 .upcoming-slot.cursed::after {
-  content: "咒";
+  content: "呪";
   position: absolute;
   right: 3px;
   top: 2px;
@@ -161,8 +161,8 @@ canvas {
 .label {
   margin: 0;
   color: var(--muted);
-  font-size: 1.08rem;
-  font-weight: 700;
+  font-size: 1.26rem;
+  font-weight: 400;
   text-align: center;
   writing-mode: vertical-rl;
   text-orientation: upright;
@@ -170,8 +170,8 @@ canvas {
 
 .value {
   margin: 0;
-  font-size: 1.38rem;
-  font-weight: 800;
+  font-size: 1.58rem;
+  font-weight: 400;
   line-height: 1;
   text-align: center;
   writing-mode: vertical-rl;
@@ -307,6 +307,10 @@ canvas {
   text-orientation: upright;
 }
 
+.is-idle .round-value {
+  visibility: hidden;
+}
+
 @keyframes hp-shake {
   0%,
   100% {
@@ -380,6 +384,10 @@ button:focus-visible {
   outline-offset: 3px;
 }
 
+#new-run {
+  display: none;
+}
+
 .red {
   color: var(--red-heart);
 }
@@ -432,11 +440,11 @@ button:focus-visible {
   }
 
   .label {
-    font-size: 1.1rem;
+    font-size: 1.34rem;
   }
 
   .value {
-    font-size: 1.4rem;
+    font-size: 1.66rem;
   }
 
   .stat-value-row {

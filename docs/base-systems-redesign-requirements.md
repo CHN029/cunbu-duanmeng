@@ -58,7 +58,7 @@ permanent Slash scaling.
 
 ### 1. Curse block creates a pending Curse
 
-- Resolving `咒` creates one pending Curse chain.
+- Resolving `呪` creates one pending Curse chain.
 - If the current encounter has no valid monster, the Curse waits for the next applicable monster.
 - The pending state must be visible to the player.
 - Empty encounters must not discard the Curse.

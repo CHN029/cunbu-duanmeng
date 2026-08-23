@@ -98,9 +98,9 @@ Current normal blocks:
 
 - `藥`: healing
 - `斬`: slash attack
-- `咒`: curse
+- `呪`: curse
 - `寶`: treasure
-- `勢`: momentum
+- `機`: opening / momentum
 - `甲`: armor/shield
 
 The retained `劍` block type is deprecated for normal generation during the current combat
@@ -108,9 +108,9 @@ prototype. Sword progression is tested through bounded merchant blessings instea
 
 Current monster blocks:
 
-- `賊`: value 1
-- `鬼`: value 2
-- `將`: value 3
+- `獸`: value 1
+- `賊`: value 2
+- `兇`: value 3
 
 `src/core/runOrchestrator.js`
 

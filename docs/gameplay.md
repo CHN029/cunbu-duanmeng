@@ -62,9 +62,9 @@ Long-lasting modifier blessings bought from the merchant. One-time stat blessing
 Persistent Guard. It is shown as blue protection dots in the health meter, remains between
 encounters until consumed, and has a small cap.
 
-`咒`
+`呪`
 
-Curse chain state. A small `咒` tag means a future monster will be cursed.
+Curse chain state. A small `呪` tag means a future monster will be cursed.
 
 ## Normal Blocks
 
@@ -79,31 +79,31 @@ blessing bonuses.
 
 Damage bleeds across monsters in the current encounter only. If the first bottom-row monster is slain and damage remains, the remainder can hit the other bottom-row monster. It cannot reach monsters stacked above the bottom row.
 
-`咒`
+`呪`
 
 Curse. Starts one finite Curse chain:
 
 ```text
-咒 -> Cursed Monster -> treasure or no reward -> end
+呪 -> Cursed Monster -> treasure or no reward -> end
 ```
 
-Resolving `咒` marks a future monster encounter; it does not affect monsters already in the current
+Resolving `呪` marks a future monster encounter; it does not affect monsters already in the current
 encounter. At the start of the next monster encounter, the curse flies from the side panel to the
 front monster, which becomes `夜叉` and gains +1 value. If that monster is
 slain before it attacks, the player gains `二` 財寶. If the Cursed Monster survives to attack, the
 chain ends with no reward.
 
-Only one Curse chain can exist at a time. While a chain is active, additional future `咒` blocks are
+Only one Curse chain can exist at a time. While a chain is active, additional future `呪` blocks are
 deterministically replaced by `斬`.
 
 `寶`
 
 Treasure. When resolved, `財寶 +1`.
 
-`勢`
+`機`
 
-Momentum. Converts one `斬` in the encounter into `必殺`. A `必殺` Slash instantly slays the
-frontmost monster. Multiple Momentum blocks can convert multiple Slashes.
+Opening. Converts one `斬` in the same settled row into `必殺`. A `必殺` Slash instantly slays the
+frontmost monster. Multiple Opening blocks can convert multiple Slashes when each has its own paired Slash.
 
 `甲`
 
@@ -114,15 +114,15 @@ attack, including attacks from Cursed Monsters.
 
 Monster value is both health and damage.
 
-`賊`
+`獸`
 
 Value 1.
 
-`鬼`
+`賊`
 
 Value 2.
 
-`將`
+`兇`
 
 Value 3.
 
@@ -143,7 +143,7 @@ Resolution order:
 2. `斬` blocks
 3. Bottom-row monster blocks
 
-This means setup blocks like `勢`, `甲`, `藥`, `寶`, and `咒` resolve before attacks, regardless of their left-to-right position.
+This means setup blocks like `機`, `甲`, `藥`, `寶`, and `呪` resolve before attacks, regardless of their left-to-right position.
 
 ## Encounter Feedback
 
@@ -228,5 +228,5 @@ The game already has the shape of a roguelike, but several systems are intention
 - `奪` starts at 10% and can be raised by `斬奪`; both values are tunable.
 - Treasure pacing needs tuning once shop boons matter.
 - Monster frequency, monster tiers, and normal block appearance percentages are tunable but not balanced yet.
-- Curse frequency and whether `咒` replacement should always become `斬` are provisional.
+- Curse frequency and whether extra active-chain `呪` blocks should stack later are provisional.
 - The board puzzle should continue to reward planning around encounter order.

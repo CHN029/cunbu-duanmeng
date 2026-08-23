@@ -1,5 +1,5 @@
 import { toChineseNumber } from "../ui/chineseNumbers.js?v=20260821-1";
-import { COLORS } from "../theme/colors.js?v=20260821-16";
+import { COLORS } from "../theme/colors.js?v=20260821-19";
 
 export function drawMerchant(context, canvas, merchant) {
   const layout = getMerchantLayout(canvas, merchant.options.length);

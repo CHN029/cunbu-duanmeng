@@ -46,6 +46,9 @@ export const EFFECT_MS = 520;
 // Milliseconds slash blade-line effects stay alive.
 export const SLASH_BEAM_EFFECT_MS = 240;
 
+// Milliseconds a monster block shakes when crossed by a slash blade.
+export const MONSTER_HIT_SHAKE_MS = 220;
+
 // Milliseconds after the slash line starts before monster damage is revealed.
 export const SLASH_DAMAGE_REVEAL_DELAY_MS = SLASH_BEAM_EFFECT_MS + 240;
 
@@ -55,7 +58,7 @@ export const SLAY_MARK_FADE_MS = 420;
 // Milliseconds used to reveal a Momentum-boosted Slash as 必殺.
 export const INSTANT_SLASH_REVEAL_MS = 360;
 
-// Milliseconds used to reveal a Cursed Monster as 煞 after the curse arrives.
+// Milliseconds used to reveal a Cursed Monster as 鬼 after the curse arrives.
 export const CURSED_MONSTER_REVEAL_MS = 360;
 
 // Whether slain monsters can trigger 奪 loot rewards after slash damage.
@@ -145,9 +148,6 @@ export const CURSED_MONSTER_TREASURE_GAIN = 2;
 // Treasure gained when 寶 resolves.
 export const TREASURE_BLOCK_GAIN = 1;
 
-// Number of Slashes converted to 必殺 by each 勢 block.
-export const MOMENTUM_BLOCK_INSTANT_SLASH_GAIN = 1;
-
 // Intrinsic damage dealt by each ordinary 斬 before local or blessing bonuses.
 export const SLASH_INTRINSIC_DAMAGE = 1;
 
@@ -160,13 +160,13 @@ export const MAX_GUARD = 6;
 // Temporary shield value of the 甲 block.
 export const ARMOR_BLOCK_VALUE = 1;
 
-// Monster health and damage value for 賊.
+// Monster health and damage value for 獸.
 export const BANDIT_VALUE = 1;
 
-// Monster health and damage value for 鬼.
+// Monster health and damage value for 賊.
 export const GHOST_VALUE = 2;
 
-// Monster health and damage value for 將.
+// Monster health and damage value for 兇.
 export const GENERAL_VALUE = 3;
 
 // Base chance that 奪 triggers when a monster is slain.

@@ -12,7 +12,6 @@ import {
   ENCOUNTER_STEP_MS,
   ENCOUNTER_UI_EFFECT_WAIT_MS,
   HEAL_BLOCK_BODY_GAIN,
-  INSTANT_SLASH_REVEAL_MS,
   LOOT_BODY_GAIN,
   LOOT_CHANCE,
   LOOT_CHANCE_BLESSING_BONUS,
@@ -21,7 +20,7 @@ import {
   LOOT_TREASURE_GAIN,
   MAX_GUARD,
   MAX_SWORD_SKILL,
-  MOMENTUM_BLOCK_INSTANT_SLASH_GAIN,
+  MONSTER_HIT_SHAKE_MS,
   MONSTER_START_X,
   NORMAL_COLUMNS,
   SLASH_LOOT_ENABLED,
@@ -31,11 +30,11 @@ import {
   TREASURE_BLOCK_GAIN,
   UI_EFFECT_MS,
   UI_EFFECT_STAGGER_MS,
-} from "./config.js?v=20260822-20";
-import { getSlashDamage } from "./combatRules.js?v=20260822-5";
+} from "./config.js?v=20260822-24";
+import { getSlashDamage } from "./combatRules.js?v=20260822-7";
 import { addEffect, updateEffects } from "./effects.js?v=20260822-1";
 import { addUiEffect } from "./uiEffects.js?v=20260822-4";
-import { COLORS } from "../theme/colors.js?v=20260821-16";
+import { COLORS } from "../theme/colors.js?v=20260821-19";
 
 export function startEncounter(game) {
   const normalEvents = game.board[BOARD_HEIGHT - 1]
@@ -50,8 +49,6 @@ export function startEncounter(game) {
     if (block) monsterEvents.push({ type: "monster", block, x, y: BOARD_HEIGHT - 1 });
   }
 
-  const instantSlashCount = getPreEncounterInstantSlashCount(supportEvents, attackEvents);
-
   game.encounter = {
     queue: createEncounterGroups(supportEvents, attackEvents, monsterEvents),
     current: null,
@@ -60,19 +57,10 @@ export function startEncounter(game) {
     introElapsed: 0,
     introDuration: ENCOUNTER_INTRO_MS,
     slashCount: attackEvents.length,
-    instantSlashCount,
     hasMonsters: monsterEvents.length > 0,
   };
-  markInstantSlashReveals(game);
 
   attachPendingCurseToFrontMonster(game);
-}
-
-function getPreEncounterInstantSlashCount(supportEvents, attackEvents) {
-  if (!attackEvents.length) return 0;
-
-  const momentumCount = supportEvents.filter((event) => event.block.type === "O").length;
-  return Math.min(attackEvents.length, momentumCount * MOMENTUM_BLOCK_INSTANT_SLASH_GAIN);
 }
 
 function createEncounterGroups(supportEvents, attackEvents, monsterEvents) {
@@ -207,16 +195,6 @@ function applyNormalBlock(game, event, delay = 0) {
 
   if (block.type === "D") {
     game.player.swordSkill = Math.min(MAX_SWORD_SKILL, game.player.swordSkill + SWORD_BLOCK_SKILL_GAIN);
-    addUiEffect(game, {
-      type: "travel",
-      label: "劍",
-      color: COLORS.corners.sword,
-      target: "sword",
-      delay,
-      x: event.x,
-      y: event.y,
-    });
-    wait = ENCOUNTER_UI_EFFECT_WAIT_MS + delay;
   }
 
   if (block.type === "L") {
@@ -274,7 +252,7 @@ function applyNormalBlock(game, event, delay = 0) {
 }
 
 function hasTravelingSupportGlyph(block) {
-  return ["B", "C", "D", "T", "E"].includes(block.type);
+  return ["B", "C", "T", "E"].includes(block.type);
 }
 
 function getArmorBlockValue(game, block) {
@@ -282,8 +260,9 @@ function getArmorBlockValue(game, block) {
 }
 
 function damageFrontMonsters(game, slashEvents, sources) {
-  let instantSlays = Math.min(game.encounter?.instantSlashCount ?? 0, slashEvents.length);
-  let normalDamage = getOrdinarySlashDamage(game, slashEvents.slice(instantSlays));
+  const instantSlashEvents = slashEvents.filter((event) => event.block.instantSlash);
+  let instantSlays = instantSlashEvents.length;
+  let normalDamage = getOrdinarySlashDamage(game, slashEvents.filter((event) => !event.block.instantSlash));
   let wait = ENCOUNTER_MINOR_EFFECT_WAIT_MS;
   const targets = [];
 
@@ -300,6 +279,7 @@ function damageFrontMonsters(game, slashEvents, sources) {
     };
     target.block.value -= damage;
     targets.push({
+      block: target.block,
       x: target.x,
       y: target.y,
       damage: Math.min(previousValue, damage),
@@ -320,29 +300,18 @@ function damageFrontMonsters(game, slashEvents, sources) {
   return addSlashBeamEffect(game, sources, targets, wait);
 }
 
-function markInstantSlashReveals(game, delay = 0) {
-  const attackGroup = game.encounter?.queue.find((group) => group.type === "attack");
-  if (!attackGroup) return;
-
-  attackGroup.events
-    .filter((event) => event.block.type === "L")
-    .sort((a, b) => a.x - b.x)
-    .slice(0, game.encounter.instantSlashCount)
-    .forEach((event) => {
-      if (event.block.instantRevealFade) return;
-      event.block.instantRevealFade = {
-        elapsed: -delay,
-        duration: INSTANT_SLASH_REVEAL_MS,
-      };
-    });
-}
-
 function addSlashBeamEffect(game, source, targets, wait) {
   if (!targets.length) {
     return Math.max(wait, ENCOUNTER_ATTACK_EFFECT_WAIT_MS);
   }
 
   const sources = Array.isArray(source) ? source : [source];
+  targets.forEach((target) => {
+    target.block.hitShake = {
+      elapsed: 0,
+      duration: MONSTER_HIT_SHAKE_MS,
+    };
+  });
   sources.forEach((item) => {
     addEffect(game, {
       type: "slashBeam",
@@ -367,7 +336,7 @@ function tryLootSlainMonster(game, target) {
     healPlayer(game.player, LOOT_BODY_GAIN);
   }
 
-  addEffect(game, { label: "奪", color: COLORS.lootGreen, x: target.x, y: target.y, delay: LOOT_EFFECT_DELAY_MS });
+  addEffect(game, { label: "奪", color: COLORS.corners.treasure, x: target.x, y: target.y, delay: LOOT_EFFECT_DELAY_MS });
   return true;
 }
 
@@ -452,7 +421,7 @@ function attachPendingCurseToFrontMonster(game) {
   };
   addUiEffect(game, {
     type: "travel",
-    label: "咒",
+    label: "呪",
     color: COLORS.corners.curse,
     source: "curse",
     target: "cell",
@@ -468,15 +437,19 @@ function resolveSlainCursedMonsterReward(game, delay = 0) {
   if (!target) return false;
 
   game.player.treasure += CURSED_MONSTER_TREASURE_GAIN;
-  addUiEffect(game, {
-    type: "travel",
-    label: "寶",
-    color: COLORS.corners.treasure,
-    target: "treasure",
-    delay,
-    x: target.x,
-    y: target.y,
-  });
+  for (let index = 0; index < CURSED_MONSTER_TREASURE_GAIN; index += 1) {
+    addUiEffect(game, {
+      type: "travel",
+      label: "寶",
+      color: COLORS.corners.treasure,
+      target: "treasure",
+      deferPanelStat: "treasure",
+      amount: 1,
+      delay: delay + index * UI_EFFECT_STAGGER_MS,
+      x: target.x,
+      y: target.y,
+    });
+  }
   endCurseChain(game);
   return true;
 }
