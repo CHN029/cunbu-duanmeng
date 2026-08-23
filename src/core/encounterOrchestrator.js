@@ -152,8 +152,17 @@ function completeEncounterEvent(game, event, delay = 0) {
   if (game.board[event.y]?.[event.x] !== event.block) return ENCOUNTER_MINOR_EFFECT_WAIT_MS;
 
   if (event.type === "normal") {
-    game.board[event.y][event.x] = null;
-    return applyNormalBlock(game, event, delay);
+    const wait = applyNormalBlock(game, event, delay);
+    if (hasTravelingSupportGlyph(event.block)) {
+      event.block.pendingRemoval = {
+        elapsed: -delay,
+        x: event.x,
+        y: event.y,
+      };
+    } else {
+      game.board[event.y][event.x] = null;
+    }
+    return wait;
   }
 
   if (event.type === "monster") {
@@ -252,6 +261,10 @@ function applyNormalBlock(game, event, delay = 0) {
 function getSlashDamage(game) {
   const multiplier = game.encounter?.slashMultiplier ?? 1;
   return game.player.swordSkill * multiplier + getChainSlashBonus(game);
+}
+
+function hasTravelingSupportGlyph(block) {
+  return ["B", "D", "T", "E"].includes(block.type);
 }
 
 function getChainSlashBonus(game) {

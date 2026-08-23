@@ -18,7 +18,7 @@ import {
   TEMPER_BODY_BODY_GAIN,
   TEMPER_BODY_MAX_BODY_GAIN,
 } from "./config.js?v=20260822-9";
-import { clearEncounter, startEncounter, updateEncounter as updateEncounterState } from "./encounterOrchestrator.js?v=20260822-15";
+import { clearEncounter, startEncounter, updateEncounter as updateEncounterState } from "./encounterOrchestrator.js?v=20260822-16";
 import { canSkipMerchant, createMerchant, isModifierBlessing, moveMerchantSelectionIndex, shouldOpenMerchant } from "./merchant.js?v=20260821-46";
 import { createMonsterPiece, createNormalPiece } from "./pieces.js?v=20260822-1";
 import { createRun, getNextRound, peekUpcomingBlocks } from "./runOrchestrator.js?v=20260822-1";
@@ -163,6 +163,7 @@ export function updateEncounter(game, delta) {
 }
 
 export function updateBoardAnimations(game, delta) {
+  updatePendingRemovals(game, delta);
   updateDamageReveals(game, delta);
 
   if (game.encounterGate) {
@@ -193,6 +194,19 @@ export function updateBoardAnimations(game, delta) {
     game.settleGate = null;
     if (shouldResume) continueAfterSettling(game);
   }
+}
+
+function updatePendingRemovals(game, delta) {
+  game.board.forEach((row, y) => {
+    row.forEach((block, x) => {
+      if (!block?.pendingRemoval) return;
+
+      block.pendingRemoval.elapsed += delta;
+      if (block.pendingRemoval.elapsed >= 0) {
+        game.board[y][x] = null;
+      }
+    });
+  });
 }
 
 function updateDamageReveals(game, delta) {

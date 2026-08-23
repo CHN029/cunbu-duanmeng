@@ -183,6 +183,7 @@ function getSettledBlockY(game, block, y) {
 }
 
 function getBoardBlockOpacity(game, block, x, y) {
+  if (block.pendingRemoval?.elapsed >= 0) return 0;
   const slainOpacity = getSlainBlockOpacity(game, block, x, y);
   if (slainOpacity !== 1) return slainOpacity;
   if (!game.encounter || y === game.height - 1) return 1;

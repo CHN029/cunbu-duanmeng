@@ -21,8 +21,8 @@ import {
   updateBoardAnimations,
   togglePause,
   updateEncounter,
-} from "./core/game.js?v=20260822-14";
-import { createCanvasRenderer } from "./renderers/canvasRenderer.js?v=20260822-33";
+} from "./core/game.js?v=20260822-15";
+import { createCanvasRenderer } from "./renderers/canvasRenderer.js?v=20260822-34";
 import { COLORS } from "./theme/colors.js?v=20260821-14";
 import { bindInput, bindSwipeInput } from "./ui/input.js?v=20260821-51";
 import { toChineseNumber } from "./ui/chineseNumbers.js?v=20260821-1";
