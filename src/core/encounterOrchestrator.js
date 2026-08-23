@@ -2,8 +2,8 @@ import { settleBoard } from "./board.js?v=20260822-2";
 import {
   BOARD_HEIGHT,
   BOARD_WIDTH,
-  CHAIN_SLASH_DAMAGE_PER_SLASH,
-  CURSE_BLOCK_DAMAGE_BONUS,
+  CURSED_MONSTER_TREASURE_GAIN,
+  CURSED_MONSTER_VALUE_BONUS,
   ENCOUNTER_ATTACK_EFFECT_WAIT_MS,
   ENCOUNTER_DAMAGE_EFFECT_WAIT_MS,
   ENCOUNTER_INTRO_MS,
@@ -12,16 +12,16 @@ import {
   ENCOUNTER_STEP_MS,
   ENCOUNTER_UI_EFFECT_WAIT_MS,
   HEAL_BLOCK_BODY_GAIN,
-  INITIAL_ENCOUNTER_CURSE_BONUS,
-  INITIAL_ENCOUNTER_SHIELD,
-  INITIAL_ENCOUNTER_SLASH_MULTIPLIER,
+  INSTANT_SLASH_REVEAL_MS,
   LOOT_BODY_GAIN,
   LOOT_CHANCE,
   LOOT_CHANCE_BLESSING_BONUS,
   LOOT_EFFECT_DELAY_MS,
   LOOT_TREASURE_CHANCE,
   LOOT_TREASURE_GAIN,
-  MOMENTUM_BLOCK_SLASH_MULTIPLIER,
+  MAX_GUARD,
+  MAX_SWORD_SKILL,
+  MOMENTUM_BLOCK_INSTANT_SLASH_GAIN,
   MONSTER_START_X,
   NORMAL_COLUMNS,
   SLASH_LOOT_ENABLED,
@@ -29,12 +29,13 @@ import {
   SLASH_DAMAGE_REVEAL_DELAY_MS,
   SWORD_BLOCK_SKILL_GAIN,
   TREASURE_BLOCK_GAIN,
-  UI_EFFECT_APPLY_MS,
+  UI_EFFECT_MS,
   UI_EFFECT_STAGGER_MS,
-} from "./config.js?v=20260822-9";
+} from "./config.js?v=20260822-20";
+import { getSlashDamage } from "./combatRules.js?v=20260822-5";
 import { addEffect, updateEffects } from "./effects.js?v=20260822-1";
-import { addUiEffect } from "./uiEffects.js?v=20260822-2";
-import { COLORS } from "../theme/colors.js?v=20260821-14";
+import { addUiEffect } from "./uiEffects.js?v=20260822-4";
+import { COLORS } from "../theme/colors.js?v=20260821-16";
 
 export function startEncounter(game) {
   const normalEvents = game.board[BOARD_HEIGHT - 1]
@@ -49,6 +50,8 @@ export function startEncounter(game) {
     if (block) monsterEvents.push({ type: "monster", block, x, y: BOARD_HEIGHT - 1 });
   }
 
+  const instantSlashCount = getPreEncounterInstantSlashCount(supportEvents, attackEvents);
+
   game.encounter = {
     queue: createEncounterGroups(supportEvents, attackEvents, monsterEvents),
     current: null,
@@ -56,12 +59,20 @@ export function startEncounter(game) {
     duration: ENCOUNTER_STEP_MS,
     introElapsed: 0,
     introDuration: ENCOUNTER_INTRO_MS,
-    slashMultiplier: INITIAL_ENCOUNTER_SLASH_MULTIPLIER,
     slashCount: attackEvents.length,
+    instantSlashCount,
     hasMonsters: monsterEvents.length > 0,
-    curseBonus: INITIAL_ENCOUNTER_CURSE_BONUS,
-    shield: INITIAL_ENCOUNTER_SHIELD,
   };
+  markInstantSlashReveals(game);
+
+  attachPendingCurseToFrontMonster(game);
+}
+
+function getPreEncounterInstantSlashCount(supportEvents, attackEvents) {
+  if (!attackEvents.length) return 0;
+
+  const momentumCount = supportEvents.filter((event) => event.block.type === "O").length;
+  return Math.min(attackEvents.length, momentumCount * MOMENTUM_BLOCK_INSTANT_SLASH_GAIN);
 }
 
 function createEncounterGroups(supportEvents, attackEvents, monsterEvents) {
@@ -121,12 +132,15 @@ export function clearEncounter(game) {
 function completeEncounterGroup(game, group) {
   if (group.type === "attack") return completeAttackGroup(game, group);
 
-  return [...group.events]
+  const wait = [...group.events]
     .sort((a, b) => a.x - b.x)
     .reduce((wait, event, index) => {
       const delay = group.type === "support" ? index * UI_EFFECT_STAGGER_MS : 0;
       return Math.max(wait, completeEncounterEvent(game, event, delay));
     }, ENCOUNTER_MINOR_EFFECT_WAIT_MS);
+
+  if (group.type === "monster") resolveSlainCursedMonsterReward(game, wait);
+  return wait;
 }
 
 function completeAttackGroup(game, group) {
@@ -140,12 +154,10 @@ function completeAttackGroup(game, group) {
     game.board[event.y][event.x] = null;
   });
 
-  if (!game.encounter?.hasMonsters) {
-    return ENCOUNTER_MINOR_EFFECT_WAIT_MS;
-  }
+  if (!game.encounter?.hasMonsters) return ENCOUNTER_MINOR_EFFECT_WAIT_MS;
 
-  const damage = slashEvents.reduce((sum) => sum + getSlashDamage(game), 0);
-  return damageFrontMonsters(game, damage, slashEvents);
+  const wait = damageFrontMonsters(game, slashEvents, slashEvents);
+  return wait;
 }
 
 function completeEncounterEvent(game, event, delay = 0) {
@@ -180,14 +192,12 @@ function applyNormalBlock(game, event, delay = 0) {
   let wait = ENCOUNTER_MINOR_EFFECT_WAIT_MS;
 
   if (block.type === "B") {
+    healPlayer(game.player, HEAL_BLOCK_BODY_GAIN);
     addUiEffect(game, {
       type: "travel",
       label: block.label,
       color: COLORS.red,
       target: "body",
-      stat: "body",
-      amount: HEAL_BLOCK_BODY_GAIN,
-      applyAt: UI_EFFECT_APPLY_MS,
       delay,
       x: event.x,
       y: event.y,
@@ -196,14 +206,12 @@ function applyNormalBlock(game, event, delay = 0) {
   }
 
   if (block.type === "D") {
+    game.player.swordSkill = Math.min(MAX_SWORD_SKILL, game.player.swordSkill + SWORD_BLOCK_SKILL_GAIN);
     addUiEffect(game, {
       type: "travel",
       label: "劍",
       color: COLORS.corners.sword,
       target: "sword",
-      stat: "sword",
-      amount: SWORD_BLOCK_SKILL_GAIN,
-      applyAt: UI_EFFECT_APPLY_MS,
       delay,
       x: event.x,
       y: event.y,
@@ -216,18 +224,27 @@ function applyNormalBlock(game, event, delay = 0) {
   }
 
   if (block.type === "C") {
-    if (game.encounter) game.encounter.curseBonus += CURSE_BLOCK_DAMAGE_BONUS;
+    if (startPendingCurse(game)) {
+      addUiEffect(game, {
+        type: "travel",
+        label: block.label,
+        color: COLORS.corners.curse,
+        target: "curse",
+        delay,
+        x: event.x,
+        y: event.y,
+      });
+      wait = ENCOUNTER_UI_EFFECT_WAIT_MS + delay;
+    }
   }
 
   if (block.type === "T") {
+    game.player.treasure += TREASURE_BLOCK_GAIN;
     addUiEffect(game, {
       type: "travel",
       label: "寶",
       color: COLORS.corners.treasure,
       target: "treasure",
-      stat: "treasure",
-      amount: TREASURE_BLOCK_GAIN,
-      applyAt: UI_EFFECT_APPLY_MS,
       delay,
       x: event.x,
       y: event.y,
@@ -236,18 +253,16 @@ function applyNormalBlock(game, event, delay = 0) {
   }
 
   if (block.type === "O") {
-    if (game.encounter) game.encounter.slashMultiplier *= MOMENTUM_BLOCK_SLASH_MULTIPLIER;
+    wait = ENCOUNTER_MINOR_EFFECT_WAIT_MS;
   }
 
   if (block.type === "E") {
+    addGuard(game.player, getArmorBlockValue(game, block));
     addUiEffect(game, {
       type: "travel",
       label: "甲",
       color: COLORS.corners.armor,
       target: "body",
-      stat: "shield",
-      amount: getArmorBlockValue(game, block),
-      applyAt: UI_EFFECT_APPLY_MS,
       delay,
       x: event.x,
       y: event.y,
@@ -258,56 +273,68 @@ function applyNormalBlock(game, event, delay = 0) {
   return wait;
 }
 
-function getSlashDamage(game) {
-  const multiplier = game.encounter?.slashMultiplier ?? 1;
-  return game.player.swordSkill * multiplier + getChainSlashBonus(game);
-}
-
 function hasTravelingSupportGlyph(block) {
-  return ["B", "D", "T", "E"].includes(block.type);
-}
-
-function getChainSlashBonus(game) {
-  if (!game.player.blessingIds.includes("chainSlash")) return 0;
-  if ((game.encounter?.slashCount ?? 0) <= 1) return 0;
-  return game.encounter.slashCount * CHAIN_SLASH_DAMAGE_PER_SLASH;
+  return ["B", "C", "D", "T", "E"].includes(block.type);
 }
 
 function getArmorBlockValue(game, block) {
   return block.value + game.player.armorValueBonus;
 }
 
-function damageFrontMonsters(game, damage, sources) {
-  let remainingDamage = damage;
+function damageFrontMonsters(game, slashEvents, sources) {
+  let instantSlays = Math.min(game.encounter?.instantSlashCount ?? 0, slashEvents.length);
+  let normalDamage = getOrdinarySlashDamage(game, slashEvents.slice(instantSlays));
   let wait = ENCOUNTER_MINOR_EFFECT_WAIT_MS;
   const targets = [];
 
-  while (remainingDamage > 0) {
+  while (instantSlays > 0 || normalDamage > 0) {
     const target = findFrontEncounterMonster(game);
     if (!target) return addSlashBeamEffect(game, sources, targets, wait);
 
     const previousValue = target.block.value;
+    const damage = instantSlays > 0 ? previousValue : normalDamage;
     target.block.damageReveal = {
       fromValue: previousValue,
       elapsed: 0,
       delay: SLASH_DAMAGE_REVEAL_DELAY_MS,
     };
-    target.block.value -= remainingDamage;
+    target.block.value -= damage;
     targets.push({
       x: target.x,
       y: target.y,
-      damage: Math.min(previousValue, remainingDamage),
+      damage: Math.min(previousValue, damage),
     });
 
     if (target.block.value > 0) return addSlashBeamEffect(game, sources, targets, ENCOUNTER_ATTACK_EFFECT_WAIT_MS);
 
-    remainingDamage = Math.abs(target.block.value);
+    if (instantSlays > 0) {
+      instantSlays -= 1;
+    } else {
+      normalDamage = Math.abs(target.block.value);
+    }
     target.block.value = 0;
     target.block.slayed = true;
     wait = tryLootSlainMonster(game, target) ? ENCOUNTER_SLAY_EFFECT_WAIT_MS : ENCOUNTER_ATTACK_EFFECT_WAIT_MS;
   }
 
   return addSlashBeamEffect(game, sources, targets, wait);
+}
+
+function markInstantSlashReveals(game, delay = 0) {
+  const attackGroup = game.encounter?.queue.find((group) => group.type === "attack");
+  if (!attackGroup) return;
+
+  attackGroup.events
+    .filter((event) => event.block.type === "L")
+    .sort((a, b) => a.x - b.x)
+    .slice(0, game.encounter.instantSlashCount)
+    .forEach((event) => {
+      if (event.block.instantRevealFade) return;
+      event.block.instantRevealFade = {
+        elapsed: -delay,
+        duration: INSTANT_SLASH_REVEAL_MS,
+      };
+    });
 }
 
 function addSlashBeamEffect(game, source, targets, wait) {
@@ -381,16 +408,14 @@ function removeSlainMonsters(board) {
 }
 
 function takeDamage(game, event) {
-  const bonus = game.encounter?.curseBonus ?? 0;
   const monsterValue = event?.block?.value ?? game.encounter?.current?.block?.value ?? 1;
-  const incomingDamage = monsterValue + bonus;
-  const shieldedDamage = Math.min(game.encounter?.shield ?? 0, incomingDamage);
+  const incomingDamage = monsterValue;
+  const shieldedDamage = Math.min(game.player.guard, incomingDamage);
   const finalDamage = incomingDamage - shieldedDamage;
 
-  if (game.encounter) game.encounter.shield -= shieldedDamage;
+  game.player.guard -= shieldedDamage;
   game.player.body -= finalDamage;
-  if (game.encounter) game.encounter.curseBonus = 0;
-  if (shieldedDamage > 0) addUiEffect(game, { type: "expand", label: "甲", color: COLORS.corners.armor, target: "body" });
+  if (event.block?.cursedMonster) endCurseChain(game);
   if (finalDamage > 0) addUiEffect(game, { type: "shake", target: "body" });
 
   if (game.player.body <= 0) {
@@ -400,8 +425,102 @@ function takeDamage(game, event) {
   return shieldedDamage > 0 || finalDamage > 0 ? ENCOUNTER_DAMAGE_EFFECT_WAIT_MS : ENCOUNTER_MINOR_EFFECT_WAIT_MS;
 }
 
+function startPendingCurse(game) {
+  if (isCurseChainActive(game)) return false;
+
+  game.player.curseChain = {
+    phase: "pendingMonster",
+  };
+  return true;
+}
+
+function attachPendingCurseToFrontMonster(game) {
+  if (game.player.curseChain?.phase !== "pendingMonster") return false;
+
+  const target = findFrontEncounterMonster(game);
+  if (!target) return false;
+
+  target.block.cursedMonster = true;
+  target.block.value += CURSED_MONSTER_VALUE_BONUS;
+  target.block.curseValueBonus = CURSED_MONSTER_VALUE_BONUS;
+  target.block.curseReveal = {
+    elapsed: 0,
+    duration: UI_EFFECT_MS,
+  };
+  game.player.curseChain = {
+    phase: "cursedMonster",
+  };
+  addUiEffect(game, {
+    type: "travel",
+    label: "咒",
+    color: COLORS.corners.curse,
+    source: "curse",
+    target: "cell",
+    path: "curseToMonster",
+    targetX: target.x,
+    targetY: target.y,
+  });
+  return true;
+}
+
+function resolveSlainCursedMonsterReward(game, delay = 0) {
+  const target = findSlainCursedEncounterMonster(game);
+  if (!target) return false;
+
+  game.player.treasure += CURSED_MONSTER_TREASURE_GAIN;
+  addUiEffect(game, {
+    type: "travel",
+    label: "寶",
+    color: COLORS.corners.treasure,
+    target: "treasure",
+    delay,
+    x: target.x,
+    y: target.y,
+  });
+  endCurseChain(game);
+  return true;
+}
+
+function getOrdinarySlashDamage(game, slashEvents) {
+  return slashEvents.reduce((sum, event) => sum + getSlashDamage(game, game.encounter, event.block), 0);
+}
+
+function isCurseChainActive(game) {
+  return game.player.curseChain?.phase && game.player.curseChain.phase !== "inactive";
+}
+
+function findSlainCursedEncounterMonster(game) {
+  const monsterEvents = getMonsterEncounterEvents(game);
+
+  for (const event of monsterEvents) {
+    const block = game.board[event.y]?.[event.x];
+    if (block === event.block && block.cursedMonster && block.slayed) {
+      return { block, x: event.x, y: event.y };
+    }
+  }
+
+  return null;
+}
+
+function getMonsterEncounterEvents(game) {
+  return [
+    ...(game.encounter?.current?.events ?? []),
+    ...(game.encounter?.queue ?? []).flatMap((group) => group.events),
+  ].filter((event) => event?.type === "monster");
+}
+
+function endCurseChain(game) {
+  game.player.curseChain = {
+    phase: "inactive",
+  };
+}
+
 function healPlayer(player, amount) {
   player.body = Math.min(player.maxBody, player.body + amount);
+}
+
+function addGuard(player, amount) {
+  player.guard = Math.min(MAX_GUARD, player.guard + amount);
 }
 
 function isMonsterBlock(block) {

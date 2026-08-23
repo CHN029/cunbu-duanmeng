@@ -1,5 +1,5 @@
 import { toChineseNumber } from "../ui/chineseNumbers.js?v=20260821-1";
-import { COLORS } from "../theme/colors.js?v=20260821-14";
+import { COLORS } from "../theme/colors.js?v=20260821-16";
 
 export function drawMerchant(context, canvas, merchant) {
   const layout = getMerchantLayout(canvas, merchant.options.length);
@@ -43,8 +43,8 @@ function getMerchantLayout(canvas, optionCount) {
     titleRightX: canvas.width / 2 + titleGap / 2,
     options,
     skipX: options[optionCount - 1].x - skipGap,
-    optionLabelY: canvas.height * 0.4,
-    optionDescriptionY: canvas.height * 0.53,
+    optionLabelY: canvas.height * 0.36,
+    optionDescriptionY: canvas.height * 0.58,
   };
 }
 

@@ -1,6 +1,6 @@
-import { drawMerchant } from "./merchantRenderer.js?v=20260821-42";
-import { CHAIN_SLASH_DAMAGE_PER_SLASH } from "../core/config.js?v=20260822-9";
-import { COLORS } from "../theme/colors.js?v=20260821-14";
+import { drawMerchant } from "./merchantRenderer.js?v=20260822-1";
+import { getEncounterEvents, getSlashDamage as getResolvedSlashDamage, isInstantSlashEvent } from "../core/combatRules.js?v=20260822-5";
+import { COLORS } from "../theme/colors.js?v=20260821-16";
 
 export function createCanvasRenderer(canvas) {
   const context = canvas.getContext("2d");
@@ -149,26 +149,123 @@ function drawCell(context, x, y, cell, block, normalColumns, laneGap, game, visu
   drawCornerMarks(context, left, top, size, block);
   if (visual.monsterAttackProgress != null) drawMonsterAttackShadow(context, left, top, size, block, visual.monsterAttackProgress);
   if (visual.slashChargeProgress != null) {
-    drawSlashCharge(context, left, top, size, visual.slashChargeProgress);
+    drawSlashCharge(context, left, top, size, visual.slashChargeProgress, visual.slashChargeLabel);
     context.restore();
     return;
   }
 
-  context.fillStyle = getGlyphColor(block);
-  context.font = `${isMonster ? 500 : 400} ${Math.floor(cell * 0.7)}px "Huiwen-Fangsong", "STFangsong", "Songti TC", serif`;
-  context.textAlign = "center";
-  context.textBaseline = "middle";
-  context.fillText(block.label, left + size / 2, top + size * getGlyphCenterY(block));
+  drawBlockGlyph(context, left, top, size, block, game, x, y, isMonster);
   if (block.slayed && !block.damageReveal) drawSlainMonsterRing(context, left, top, size, getSlayMarkAlpha(block));
 
   if (isMonster) {
     drawValueDots(context, left, top, size, getMonsterDisplayValue(block));
   }
-  if (block.type === "L") {
+  if (block.type === "L" && !isInstantSlashBlock(game.encounter, block, x, y)) {
     drawValueDots(context, left, top, size, getSlashDamage(game, block, x, y));
   }
   if (block.type === "E") {
     drawValueDots(context, left, top, size, getArmorBlockValue(game, block), COLORS.corners.armor);
+  }
+  context.restore();
+}
+
+function drawBlockGlyph(context, left, top, size, block, game, x, y, isMonster) {
+  context.fillStyle = getGlyphColor(block);
+  context.textAlign = "center";
+  context.textBaseline = "middle";
+
+  if (isVisibleCursedMonster(block)) {
+    if (block.curseRevealFade) {
+      const progress = Math.min(block.curseRevealFade.elapsed / block.curseRevealFade.duration, 1);
+      drawGlyphMorph(context, {
+        from: block.label,
+        to: "煞",
+        x: left + size / 2,
+        y: top + size * 0.5,
+        size,
+        progress,
+        fromColor: COLORS.glyph,
+        color: COLORS.glyph,
+      });
+      return;
+    }
+    context.font = `400 ${Math.floor(size * 0.7)}px "Huiwen-Fangsong", "STFangsong", "Songti TC", serif`;
+    context.fillText("煞", left + size / 2, top + size * 0.5);
+    return;
+  }
+
+  if (isInstantSlashBlock(game.encounter, block, x, y)) {
+    if (block.instantRevealFade) {
+      const progress = Math.min(Math.max(block.instantRevealFade.elapsed, 0) / block.instantRevealFade.duration, 1);
+      drawGlyphMorph(context, {
+        from: block.label,
+        to: "必殺",
+        x: left + size / 2,
+        y: top + size * 0.5,
+        size,
+        progress,
+        fromColor: COLORS.red,
+        color: COLORS.red,
+      });
+      return;
+    }
+    drawCompressedVerticalGlyph(context, "必殺", left + size / 2, top + size * 0.5, size * 0.74, 0.52, 1.02);
+    return;
+  }
+
+  context.font = `400 ${Math.floor(size * 0.7)}px "Huiwen-Fangsong", "STFangsong", "Songti TC", serif`;
+  context.fillText(block.label, left + size / 2, top + size * getGlyphCenterY(block));
+}
+
+function drawVerticalGlyph(context, text, x, y, fontSize, lineGap = 0) {
+  context.font = `400 ${Math.floor(fontSize)}px "Huiwen-Fangsong", "STFangsong", "Songti TC", serif`;
+  Array.from(text).forEach((char, index) => {
+    context.fillText(char, x, y + index * (fontSize + lineGap));
+  });
+}
+
+function drawCompressedVerticalGlyph(context, text, x, y, fontSize, yScale, lineAdvance = 0.92) {
+  const chars = Array.from(text);
+  const advance = fontSize * lineAdvance;
+  const startY = -((chars.length - 1) * advance) / 2;
+
+  context.save();
+  context.translate(x, y);
+  context.scale(1, yScale);
+  drawVerticalGlyph(context, text, 0, startY, fontSize, fontSize * (lineAdvance - 1));
+  context.restore();
+}
+
+function drawGlyphMorph(context, { from, to, x, y, size, progress, fromColor = COLORS.glyph, color }) {
+  const fromAlpha = Math.max(0, 1 - progress * 1.75);
+  const toAlpha = Math.min(1, Math.max(0, (progress - 0.22) / 0.58));
+  const fromScaleY = Math.max(0.18, 1 - progress * 0.82);
+  const easedToAlpha = easeOutCubic(toAlpha);
+  const toScaleY = 0.18 + easedToAlpha * (to.length > 1 ? 0.34 : 0.82);
+
+  context.save();
+  context.globalAlpha *= fromAlpha;
+  context.fillStyle = fromColor;
+  context.font = `400 ${Math.floor(size * 0.7)}px "Huiwen-Fangsong", "STFangsong", "Songti TC", serif`;
+  context.textAlign = "center";
+  context.textBaseline = "middle";
+  context.translate(x, y);
+  context.scale(1, fromScaleY);
+  context.fillText(from, 0, 0);
+  context.restore();
+
+  context.save();
+  context.globalAlpha *= toAlpha;
+  context.fillStyle = color;
+  context.textAlign = "center";
+  context.textBaseline = "middle";
+  if (to.length > 1) {
+    drawCompressedVerticalGlyph(context, to, x, y, size * 0.74, toScaleY, 1.02);
+  } else {
+    context.font = `400 ${Math.floor(size * 0.7)}px "Huiwen-Fangsong", "STFangsong", "Songti TC", serif`;
+    context.translate(x, y);
+    context.scale(1, toScaleY);
+    context.fillText(to, 0, 0);
   }
   context.restore();
 }
@@ -201,16 +298,33 @@ function getSlayMarkAlpha(block) {
   if (!block.slayMark) return 1;
 
   const progress = Math.min((block.slayMark.elapsed ?? 0) / (block.slayMark.duration ?? 1), 1);
-  return easeOutCubic(progress);
+  return progress * progress * (3 - 2 * progress);
 }
 
 function drawSlainMonsterRing(context, left, top, size, alpha = 1) {
+  const centerX = left + size / 2;
+  const centerY = top + size * 0.5;
+  const radius = size * 0.23;
+
   context.save();
-  context.strokeStyle = COLORS.red;
   context.globalAlpha *= 0.92 * alpha;
-  context.lineWidth = Math.max(2.2, size * 0.04);
+
+  context.strokeStyle = COLORS.white;
+  context.lineWidth = Math.max(1.8, size * 0.038);
   context.beginPath();
-  context.arc(left + size / 2, top + size * 0.48, size * 0.24, 0, Math.PI * 2);
+  context.arc(centerX, centerY, radius + size * 0.032, 0, Math.PI * 2);
+  context.stroke();
+
+  context.strokeStyle = COLORS.red;
+  context.lineWidth = Math.max(1.7, size * 0.032);
+  context.beginPath();
+  context.arc(centerX, centerY, radius, 0, Math.PI * 2);
+  context.stroke();
+
+  context.strokeStyle = COLORS.white;
+  context.lineWidth = Math.max(1.3, size * 0.026);
+  context.beginPath();
+  context.arc(centerX, centerY, radius - size * 0.032, 0, Math.PI * 2);
   context.stroke();
   context.restore();
 }
@@ -231,11 +345,11 @@ function drawExitAnimations(context, game, cell, normalColumns, laneGap) {
 
 function drawValueDots(context, left, top, size, value, color = COLORS.red) {
   const isCompactBoard = context.canvas.getBoundingClientRect().width <= 280;
-  const dotRadius = Math.max(isCompactBoard ? 2.8 : 2, size * (isCompactBoard ? 0.047 : 0.035));
-  const gap = size * (isCompactBoard ? 0.14 : 0.12);
+  const dotRadius = Math.max(isCompactBoard ? 2.7 : 1.9, size * (isCompactBoard ? 0.045 : 0.032));
+  const gap = size * (isCompactBoard ? 0.12 : 0.1);
   const totalWidth = (value - 1) * gap;
   const startX = left + size / 2 - totalWidth / 2;
-  const y = top + size * 0.9;
+  const y = top + size - Math.max(4, size * 0.065);
 
   context.fillStyle = color;
 
@@ -248,12 +362,7 @@ function drawValueDots(context, left, top, size, value, color = COLORS.red) {
 
 function getSlashDamage(game, block, x, y) {
   const isEncounterSlash = isEncounterSlashBlock(game.encounter, block, x, y);
-  const multiplier = isEncounterSlash ? game.encounter.slashMultiplier : 1;
-  const chainBonus =
-    isEncounterSlash && game.player.blessingIds.includes("chainSlash") && (game.encounter?.slashCount ?? 0) > 1
-      ? game.encounter.slashCount * CHAIN_SLASH_DAMAGE_PER_SLASH
-      : 0;
-  return game.player.swordSkill * multiplier + chainBonus;
+  return getResolvedSlashDamage(game, isEncounterSlash ? game.encounter : null, block);
 }
 
 function isEncounterSlashBlock(encounter, block, x, y) {
@@ -262,6 +371,10 @@ function isEncounterSlashBlock(encounter, block, x, y) {
   return getEncounterEvents(encounter).some(
     (event) => event?.type === "normal" && event.block === block && event.block.type === "L" && event.x === x && event.y === y,
   );
+}
+
+function isInstantSlashBlock(encounter, block, x, y) {
+  return isInstantSlashEvent(encounter, { type: "normal", block, x, y });
 }
 
 function getArmorBlockValue(game, block) {
@@ -283,7 +396,13 @@ function getEncounterVisual(encounter, block, x, y) {
     opacity: Math.max(minOpacity, 1 - progress),
     monsterAttackProgress: currentEvent.type === "monster" && !block.slayed ? progress : null,
     slashChargeProgress: shouldShowSlashCharge(encounter, currentEvent) ? progress : null,
+    slashChargeLabel: getSlashChargeLabel(encounter, block, x, y),
   };
+}
+
+function getSlashChargeLabel(encounter, block, x, y) {
+  if (isInstantSlashBlock(encounter, block, x, y)) return "必殺";
+  return "斬";
 }
 
 function shouldShowSlashCharge(encounter, event) {
@@ -292,26 +411,19 @@ function shouldShowSlashCharge(encounter, event) {
 }
 
 function hasTravelingSupportGlyph(event) {
-  return ["B", "D", "T", "E"].includes(event.block.type);
-}
-
-function getEncounterEvents(encounter) {
-  return [
-    ...(encounter.current?.events ?? []),
-    ...(encounter.queue ?? []).flatMap((group) => group.events),
-  ];
+  return ["B", "C", "D", "T", "E"].includes(event.block.type);
 }
 
 function drawMonsterAttackShadow(context, left, top, size, block, progress) {
   const centerX = left + size / 2;
-  const centerY = top + size * 0.48;
+  const centerY = top + size * 0.5;
   const scale = 1 + progress * 1.9;
   const alpha = Math.max(0, 0.5 * (1 - progress));
 
   context.save();
   context.globalAlpha = alpha;
   context.fillStyle = COLORS.red;
-  context.font = `500 ${Math.floor(size * 0.7)}px "Huiwen-Fangsong", "STFangsong", "Songti TC", serif`;
+  context.font = `400 ${Math.floor(size * 0.7)}px "Huiwen-Fangsong", "STFangsong", "Songti TC", serif`;
   context.textAlign = "center";
   context.textBaseline = "middle";
   context.translate(centerX, centerY);
@@ -321,10 +433,13 @@ function drawMonsterAttackShadow(context, left, top, size, block, progress) {
 }
 
 function drawEffects(context, effects, cell, normalColumns, laneGap) {
+  let drewSlashTrail = false;
+
   effects.forEach((effect) => {
     if (effect.elapsed < 0) return;
     if (effect.type === "slashBeam") {
-      drawSlashBeam(context, effect, cell, normalColumns, laneGap);
+      drawSlashBeam(context, effect, cell, normalColumns, laneGap, { drawTrail: !drewSlashTrail });
+      drewSlashTrail = true;
       return;
     }
     if (effect.type === "fadeGlyph") {
@@ -343,7 +458,7 @@ function drawEffects(context, effects, cell, normalColumns, laneGap) {
     context.save();
     context.globalAlpha = alpha;
     context.fillStyle = effect.color;
-    context.font = `500 ${Math.floor(cell * 0.7)}px "Huiwen-Fangsong", "STFangsong", "Songti TC", serif`;
+    context.font = `400 ${Math.floor(cell * 0.7)}px "Huiwen-Fangsong", "STFangsong", "Songti TC", serif`;
     context.textAlign = "center";
     context.textBaseline = "middle";
     context.translate(centerX, centerY);
@@ -362,28 +477,33 @@ function drawFadeGlyph(context, effect, cell, normalColumns, laneGap) {
   context.save();
   context.globalAlpha = alpha;
   context.fillStyle = effect.color;
-  context.font = `500 ${Math.floor(cell * 0.74)}px "Huiwen-Fangsong", "STFangsong", "Songti TC", serif`;
+  context.font = `400 ${Math.floor(cell * 0.74)}px "Huiwen-Fangsong", "STFangsong", "Songti TC", serif`;
   context.textAlign = "center";
   context.textBaseline = "middle";
   context.fillText(effect.label, left + cell / 2, top + cell * 0.5);
   context.restore();
 }
 
-function drawSlashCharge(context, left, top, size, progress) {
+function drawSlashCharge(context, left, top, size, progress, label = "斬") {
   const centerX = left + size / 2;
   const centerY = top + size * 0.5;
-  const squeeze = 1 - easeOutCubic(progress) * 0.92;
+  const chargeProgress = progress;
+  const squeeze = 1 - easeOutCubic(chargeProgress) * 0.92;
   const alpha = 0.9 - progress * 0.16;
 
   context.save();
   context.globalAlpha *= alpha;
   context.fillStyle = COLORS.red;
-  context.font = `500 ${Math.floor(size * 0.74)}px "Huiwen-Fangsong", "STFangsong", "Songti TC", serif`;
+  context.font = `400 ${Math.floor(size * 0.74)}px "Huiwen-Fangsong", "STFangsong", "Songti TC", serif`;
   context.textAlign = "center";
   context.textBaseline = "middle";
   context.translate(centerX, centerY);
   context.scale(1, squeeze);
-  context.fillText("斬", 0, 0);
+  if (label.length > 1) {
+    drawCompressedVerticalGlyph(context, label, 0, 0, size * 0.74, 0.52, 1.02);
+  } else {
+    context.fillText(label, 0, 0);
+  }
   context.restore();
 
   if (progress < 0.55) return;
@@ -401,36 +521,50 @@ function drawSlashCharge(context, left, top, size, progress) {
   context.restore();
 }
 
-function drawSlashBeam(context, effect, cell, normalColumns, laneGap) {
+function drawSlashBeam(context, effect, cell, normalColumns, laneGap, options = {}) {
   const progress = Math.min(effect.elapsed / effect.duration, 1);
   const source = getEffectCellCenter(effect.x, effect.y, cell, normalColumns, laneGap);
   const targets = effect.targets.map((target) => getEffectCellCenter(target.x, target.y, cell, normalColumns, laneGap));
-  const exit = getSlashExitPoint(context, targets.at(-1) ?? source, cell);
+  const exit = getSlashExitPoint(context, source, cell);
   const points = [source, ...targets, exit];
   const segments = getPathSegments(points);
   const totalLength = segments.reduce((sum, segment) => sum + segment.length, 0);
-  const headLength = totalLength * easeInQuad(progress);
-  const bladeLength = Math.max(cell * 2.15, 96);
+  const travelProgress = Math.min(progress / 0.78, 1);
+  const headLength = totalLength * easeOutCubic(travelProgress);
+  const bladeLength = Math.max(cell * 2.4, 112);
+  const trailLength = bladeLength * 1.45;
   const tailLength = Math.max(0, headLength - bladeLength);
-  const alpha = progress < 0.82 ? 1 : Math.max(0, 1 * (1 - (progress - 0.82) / 0.18));
+  const alpha = progress < 0.8 ? 1 : Math.max(0, 1 - (progress - 0.8) / 0.2);
+
+  if (options.drawTrail) {
+    context.save();
+    context.strokeStyle = effect.color;
+    context.globalAlpha = alpha * 0.18;
+    context.lineWidth = Math.max(1, cell * 0.018);
+    context.lineCap = "round";
+    context.lineJoin = "round";
+    context.beginPath();
+    drawPathSegment(context, segments, Math.max(0, headLength - trailLength), headLength);
+    context.stroke();
+    context.restore();
+  }
 
   context.save();
   context.strokeStyle = effect.color;
   context.globalAlpha = alpha;
-  context.lineWidth = Math.max(1.4, cell * 0.026);
+  context.lineWidth = Math.max(1.7, cell * 0.032);
   context.lineCap = "round";
   context.lineJoin = "round";
   context.beginPath();
   drawPathSegment(context, segments, tailLength, headLength);
   context.stroke();
   context.restore();
-
 }
 
-function getSlashExitPoint(context, lastTarget, cell) {
+function getSlashExitPoint(context, source, cell) {
   return {
-    x: context.canvas.width + cell * 0.35,
-    y: lastTarget.y,
+    x: context.canvas.width + cell * 1.05,
+    y: source.y,
   };
 }
 
@@ -519,16 +653,19 @@ function drawCorner(context, x, y, length, xDirection, yDirection) {
 }
 
 function getGlyphColor(block) {
+  if (block.lane === "monster") return COLORS.glyph;
+  if (isVisibleCursedMonster(block)) return COLORS.corners.curse;
   if (block.type === "L") return COLORS.red;
   return COLORS.glyph;
 }
 
 function getGlyphCenterY(block) {
-  return block.lane === "monster" || block.type === "L" ? 0.48 : 0.55;
+  return block.lane === "monster" || block.type === "L" ? 0.5 : 0.55;
 }
 
 function getCornerColor(block) {
   if (!block) return COLORS.corners.grid;
+  if (isVisibleCursedMonster(block)) return COLORS.corners.curse;
   if (block.type === "B") return COLORS.corners.heal;
   if (block.type === "D") return COLORS.corners.sword;
   if (block.type === "L") return COLORS.corners.slash;
@@ -538,6 +675,10 @@ function getCornerColor(block) {
   if (block.type === "E") return COLORS.corners.armor;
   if (block.lane === "monster") return COLORS.corners.monster;
   return COLORS.corners.fallback;
+}
+
+function isVisibleCursedMonster(block) {
+  return Boolean(block.cursedMonster && !block.curseReveal);
 }
 
 function drawLaneDivider(context, canvas, normalColumns, cell, laneGap) {

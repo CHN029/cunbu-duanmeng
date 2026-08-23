@@ -46,12 +46,29 @@ Owns encounter-specific sequencing and effects:
 - resolve non-attacking blocks before `斬`
 - apply normal block effects
 - calculate slash damage and bleed-over
-- apply monster attacks, curse, and shield
+- apply monster attacks, Curse chain state, and Guard
 - roll `奪` rewards from slain monsters
 - create encounter visual effects
 - clear slain monsters and collapse the board after an encounter
 
 It mutates the shared game state during an encounter, but it does not decide the next run phase. After an encounter ends, `game.js` decides whether to start another encounter, open the merchant, spawn the next round, or stop because the player lost.
+
+Support block rule changes are applied here immediately. `src/core/uiEffects.js` is presentation-only:
+traveling glyphs, shakes, and timing should represent already-committed state, not decide whether
+healing, treasure, sword skill, or Guard exists.
+
+`src/core/combatRules.js`
+
+Shared combat calculations used by both resolution and display:
+
+- ordinary Slash damage
+- local encounter bonuses
+- bounded Sword blessing bonuses
+- `必殺` Slash selection from Momentum
+- encounter event lookup helpers
+
+Keep displayed attack values and resolved attack values routed through this module so the canvas
+does not invent gameplay numbers.
 
 `src/core/config.js`
 
@@ -80,12 +97,14 @@ Block catalogue. It defines the glyph, name, lane, and optional value for each b
 Current normal blocks:
 
 - `藥`: healing
-- `劍`: sword skill
 - `斬`: slash attack
 - `咒`: curse
 - `寶`: treasure
 - `勢`: momentum
 - `甲`: armor/shield
+
+The retained `劍` block type is deprecated for normal generation during the current combat
+prototype. Sword progression is tested through bounded merchant blessings instead.
 
 Current monster blocks:
 

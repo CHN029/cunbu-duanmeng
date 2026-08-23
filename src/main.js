@@ -6,7 +6,7 @@ import {
   MONSTER_DROP_MS,
   MONSTER_FALL_STEP_ANIMATION_MS,
   NORMAL_COLUMNS,
-} from "./core/config.js?v=20260822-9";
+} from "./core/config.js?v=20260822-20";
 import {
   canMonstersDrop,
   canMove,
@@ -21,12 +21,12 @@ import {
   updateBoardAnimations,
   togglePause,
   updateEncounter,
-} from "./core/game.js?v=20260822-15";
-import { createCanvasRenderer } from "./renderers/canvasRenderer.js?v=20260822-34";
-import { COLORS } from "./theme/colors.js?v=20260821-14";
+} from "./core/game.js?v=20260822-28";
+import { createCanvasRenderer } from "./renderers/canvasRenderer.js?v=20260822-83";
+import { COLORS } from "./theme/colors.js?v=20260821-16";
 import { bindInput, bindSwipeInput } from "./ui/input.js?v=20260821-51";
 import { toChineseNumber } from "./ui/chineseNumbers.js?v=20260821-1";
-import { updateUiEffects } from "./core/uiEffects.js?v=20260822-2";
+import { updateUiEffects } from "./core/uiEffects.js?v=20260822-4";
 
 const uiEffects = document.querySelector("#ui-effects");
 const canvas = document.querySelector("#game");
@@ -164,49 +164,42 @@ function getMonsterStepDropProgress(elapsed) {
 }
 
 function renderBodyMeter() {
-  renderBodyDots(game.player.maxBody, Math.max(0, game.player.body), game.encounter?.shield ?? 0);
+  renderBodyDots(game.player.maxBody, Math.max(0, game.player.body), game.player.guard);
 }
 
-function renderBodyDots(maxBody, currentBody, shield = 0) {
-  const shieldedIndexes = getShieldedBodyIndexes(maxBody, currentBody, shield);
-
+function renderBodyDots(maxBody, currentBody, guard = 0) {
   bodyMeter.replaceChildren(
     ...Array.from({ length: maxBody }, (_, index) => {
       const dot = document.createElement("span");
-      dot.className = `body-dot${index < currentBody ? " filled" : ""}${shieldedIndexes.has(index) ? " shielded" : ""}`;
+      dot.className = `body-dot${index < currentBody ? " filled" : ""}`;
+      return dot;
+    }),
+    ...Array.from({ length: guard }, () => {
+      const dot = document.createElement("span");
+      dot.className = "guard-dot";
       return dot;
     }),
   );
 }
 
-function getShieldedBodyIndexes(maxBody, currentBody, shield) {
-  const indexes = new Set();
-  const emptySlots = Math.max(0, maxBody - currentBody);
-  const emptyShield = Math.min(shield, emptySlots);
-
-  for (let index = currentBody; index < currentBody + emptyShield; index += 1) {
-    indexes.add(index);
-  }
-
-  const overlayShield = Math.min(currentBody, shield - emptyShield);
-  for (let index = currentBody - overlayShield; index < currentBody; index += 1) {
-    indexes.add(index);
-  }
-
-  return indexes;
-}
-
 function renderBlessings() {
-  if (game.player.blessings.length === 0) {
+  const tags = [
+    ...getBlessingStacks(game.player.blessings).map(({ label, count }) => (count > 1 ? `${label}${toChineseNumber(count)}` : label)),
+  ];
+
+  const curseTag = getCurseTag(game.player.curseChain);
+  if (curseTag) tags.push(curseTag);
+
+  if (tags.length === 0) {
     blessings.replaceChildren();
     return;
   }
 
   blessings.replaceChildren(
-    ...getBlessingStacks(game.player.blessings).map(({ label, count }) => {
+    ...tags.map((label) => {
       const tag = document.createElement("span");
-      tag.className = "blessing-tag";
-      tag.textContent = count > 1 ? `${label}${toChineseNumber(count)}` : label;
+      tag.className = `blessing-tag${label.startsWith("咒") ? " curse-tag" : ""}`;
+      tag.textContent = label;
       return tag;
     }),
   );
@@ -222,7 +215,7 @@ function renderUiEffects() {
   uiEffects.replaceChildren(
     ...effects.map((effect) => {
       const glyph = document.createElement("span");
-      const end = getTargetCenter(effect.target);
+      const end = getEffectTargetCenter(effect);
       const progress = Math.min(effect.elapsed / effect.duration, 1);
       const visual = effect.type === "travel" ? getTravelEffectVisual(effect, end) : getExpandEffectVisual(end, progress);
 
@@ -237,17 +230,28 @@ function renderUiEffects() {
 }
 
 function getTravelEffectVisual(effect, end) {
-  const start = getBoardCellCenter(effect.x, effect.y);
+  const start = getEffectStartCenter(effect);
   const rawProgress = Math.min(effect.elapsed / effect.duration, 1);
   const travelProgress = easeInQuad(rawProgress);
+  const position = effect.path === "curseToMonster"
+    ? getCurseToMonsterPosition(start, end, travelProgress)
+    : {
+        x: getTravelX(start, end, travelProgress),
+        y: getTravelY(start, end, travelProgress),
+      };
 
   return {
-    x: getTravelX(start, end, travelProgress),
-    y: getTravelY(start, end, travelProgress),
+    x: position.x,
+    y: position.y,
     scale: 1 - 0.34 * rawProgress,
     opacity: Math.max(0, 0.74 - rawProgress * 0.3),
     color: mixHexColors(COLORS.glyph, effect.color, rawProgress),
   };
+}
+
+function getEffectStartCenter(effect) {
+  if (effect.source) return getTargetCenter(effect.source);
+  return getBoardCellCenter(effect.x, effect.y);
 }
 
 function getTravelX(start, end, progress) {
@@ -264,6 +268,34 @@ function getTravelY(start, end, progress) {
 function getTravelArcHeight(start, end) {
   const distance = Math.hypot(end.x - start.x, end.y - start.y);
   return Math.min(70, Math.max(22, distance * 0.14));
+}
+
+function getCurseToMonsterPosition(start, end, progress) {
+  const deltaX = end.x - start.x;
+  const deltaY = end.y - start.y;
+  const firstControl = {
+    x: start.x + deltaX * 0.68,
+    y: start.y,
+  };
+  const secondControl = {
+    x: end.x,
+    y: start.y + deltaY * 0.56,
+  };
+
+  return getCubicBezierPoint(start, firstControl, secondControl, end, progress);
+}
+
+function getCubicBezierPoint(start, firstControl, secondControl, end, progress) {
+  const inverse = 1 - progress;
+  const startWeight = inverse ** 3;
+  const firstWeight = 3 * inverse ** 2 * progress;
+  const secondWeight = 3 * inverse * progress ** 2;
+  const endWeight = progress ** 3;
+
+  return {
+    x: start.x * startWeight + firstControl.x * firstWeight + secondControl.x * secondWeight + end.x * endWeight,
+    y: start.y * startWeight + firstControl.y * firstWeight + secondControl.y * secondWeight + end.y * endWeight,
+  };
 }
 
 function mixHexColors(from, to, amount) {
@@ -301,10 +333,8 @@ function getExpandEffectVisual(center, progress) {
 
 function renderPanelEffects() {
   const hasBodyShake = hasActiveUiEffect("body", "shake");
-  const hasShieldShake = hasActiveUiEffect("body", "expand");
 
   bodyMeter.classList.toggle("hp-shake", hasBodyShake);
-  bodyMeter.classList.toggle("shield-shake", hasShieldShake);
 }
 
 function hasActiveUiEffect(target, type) {
@@ -379,8 +409,10 @@ function resetRollingStats() {
 function getTargetCenter(target) {
   const element = {
     body: bodyMeter,
+    curse: blessings,
     sword,
     treasure,
+    upcoming,
   }[target];
   const rect = element.getBoundingClientRect();
 
@@ -388,6 +420,11 @@ function getTargetCenter(target) {
     x: rect.left + rect.width / 2,
     y: rect.top + rect.height / 2,
   };
+}
+
+function getEffectTargetCenter(effect) {
+  if (effect.target === "cell") return getBoardCellCenter(effect.targetX, effect.targetY);
+  return getTargetCenter(effect.target);
 }
 
 function easeOutCubic(value) {
@@ -404,9 +441,16 @@ function getBlessingStacks(labels) {
   return Array.from(stacks, ([label, count]) => ({ label, count }));
 }
 
+function getCurseTag(curseChain) {
+  if (!curseChain || curseChain.phase === "inactive") return "";
+  if (hasActiveUiEffect("curse", "travel")) return "";
+  if (curseChain.phase === "pendingMonster") return "咒";
+  return "";
+}
+
 function renderUpcoming() {
   const blocks = getUpcomingBlocks(game, 6);
-  const nextKey = `${game.run.currentRound}|${blocks.map((block) => block.type).join("-")}`;
+  const nextKey = `${game.run.currentRound}|${blocks.map((block) => `${block.type}${block.cursedMonster ? "!" : ""}${block.curseReveal ? "~" : ""}`).join("-")}`;
   if (nextKey === upcomingKey) return;
 
   upcomingKey = nextKey;
@@ -421,6 +465,7 @@ function renderUpcoming() {
         slot.textContent = block.label;
         slot.style.setProperty("--corner", getBlockCornerColor(block));
         slot.classList.toggle("attack", block.type === "L");
+        slot.classList.toggle("cursed", Boolean(block.cursedMonster));
       }
 
       return slot;
@@ -429,6 +474,7 @@ function renderUpcoming() {
 }
 
 function getBlockCornerColor(block) {
+  if (block.cursedMonster) return COLORS.corners.curse;
   if (block.type === "B") return COLORS.corners.heal;
   if (block.type === "D") return COLORS.corners.sword;
   if (block.type === "L") return COLORS.corners.slash;

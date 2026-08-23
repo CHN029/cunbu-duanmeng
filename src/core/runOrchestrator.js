@@ -1,4 +1,4 @@
-import { BLOCK_TYPES, MONSTER_BLOCK_KEYS, NORMAL_BLOCK_KEYS } from "./blockTypes.js?v=20260821-10";
+import { BLOCK_TYPES, MONSTER_BLOCK_KEYS, NORMAL_BLOCK_KEYS } from "./blockTypes.js?v=20260821-11";
 import {
   MONSTER_BLOCK_PERCENTAGES,
   NORMAL_BLOCKS_PER_ROUND,
@@ -6,7 +6,7 @@ import {
   NO_MONSTER_ROUND_CHANCE,
   ONE_MONSTER_AFTER_SPAWN_CHANCE,
   RUN_LENGTH,
-} from "./config.js?v=20260822-9";
+} from "./config.js?v=20260822-15";
 
 export function createRun(roundCount = RUN_LENGTH) {
   return {

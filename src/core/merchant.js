@@ -1,8 +1,8 @@
-import { MERCHANT_OPTION_COUNT, MERCHANT_SKIP_COST, MERCHANT_THRESHOLD } from "./config.js?v=20260822-9";
+import { MERCHANT_OPTION_COUNT, MERCHANT_SKIP_COST, MERCHANT_THRESHOLD } from "./config.js?v=20260822-15";
 
 export const MERCHANT_OPTIONS = [
   { id: "renewal", label: "回春", description: "體魄復滿", path: "general", category: "instant" },
-  { id: "sharpen", label: "磨鋒", description: "劍法加二", path: "swordsman", category: "instant" },
+  { id: "sharpen", label: "磨鋒", description: "斬傷加一", path: "swordsman", category: "instant" },
   { id: "chainSlash", label: "連斬", description: "多斬增傷", path: "swordsman", category: "modifier" },
   { id: "temperBody", label: "鍊體", description: "根骨體魄加二", path: "ironBody", category: "instant" },
   { id: "heavyArmor", label: "重甲", description: "甲值加一", path: "ironBody", category: "modifier" },

@@ -2,7 +2,7 @@
 export const BOARD_WIDTH = 6;
 
 // Total board rows; also controls the visual board height.
-export const BOARD_HEIGHT = 12;
+export const BOARD_HEIGHT = 9;
 
 // Player-controlled columns on the left side of the board.
 export const NORMAL_COLUMNS = 4;
@@ -44,13 +44,19 @@ export const BOARD_SETTLE_ANIMATION_MS = 180;
 export const EFFECT_MS = 520;
 
 // Milliseconds slash blade-line effects stay alive.
-export const SLASH_BEAM_EFFECT_MS = 260;
+export const SLASH_BEAM_EFFECT_MS = 240;
 
 // Milliseconds after the slash line starts before monster damage is revealed.
-export const SLASH_DAMAGE_REVEAL_DELAY_MS = SLASH_BEAM_EFFECT_MS + 180;
+export const SLASH_DAMAGE_REVEAL_DELAY_MS = SLASH_BEAM_EFFECT_MS + 240;
 
 // Milliseconds used for the red slain mark to fade onto a cut monster.
-export const SLAY_MARK_FADE_MS = 180;
+export const SLAY_MARK_FADE_MS = 420;
+
+// Milliseconds used to reveal a Momentum-boosted Slash as 必殺.
+export const INSTANT_SLASH_REVEAL_MS = 360;
+
+// Milliseconds used to reveal a Cursed Monster as 煞 after the curse arrives.
+export const CURSED_MONSTER_REVEAL_MS = 360;
 
 // Whether slain monsters can trigger 奪 loot rewards after slash damage.
 export const SLASH_LOOT_ENABLED = false;
@@ -66,9 +72,6 @@ export const ENCOUNTER_ATTACK_EFFECT_WAIT_MS = SLASH_DAMAGE_REVEAL_DELAY_MS + SL
 
 // Milliseconds stat-change glyphs travel before disappearing.
 export const UI_EFFECT_MS = 520;
-
-// Milliseconds before a traveling glyph applies its stat change.
-export const UI_EFFECT_APPLY_MS = 420;
 
 // Milliseconds between support glyph launches in the same encounter category.
 export const UI_EFFECT_STAGGER_MS = 85;
@@ -99,12 +102,12 @@ export const ONE_MONSTER_AFTER_SPAWN_CHANCE = 0.75;
 
 // Percentage chance for each normal block type; values should add up to 100.
 export const NORMAL_BLOCK_PERCENTAGES = {
-  B: 18,
-  D: 6,
-  L: 31,
+  B: 15,
+  D: 0,
+  L: 46,
   C: 5,
-  T: 14,
-  O: 12,
+  T: 10,
+  O: 10,
   E: 14,
 };
 
@@ -121,8 +124,8 @@ export const INITIAL_BODY = 3;
 // Starting maximum player health.
 export const INITIAL_MAX_BODY = 6;
 
-// Starting sword-skill damage.
-export const INITIAL_SWORD_SKILL = 1;
+// Starting bounded sword blessing bonus added to Slash damage.
+export const INITIAL_SWORD_SKILL = 0;
 
 // Starting shop currency.
 export const INITIAL_TREASURE = 0;
@@ -130,26 +133,29 @@ export const INITIAL_TREASURE = 0;
 // Healing gained when 藥 resolves.
 export const HEAL_BLOCK_BODY_GAIN = 1;
 
-// Sword skill gained when 劍 resolves.
+// Deprecated: Sword skill gained when 劍 resolves if the retained block is manually spawned.
 export const SWORD_BLOCK_SKILL_GAIN = 1;
 
-// Curse damage added to the next surviving monster attack.
-export const CURSE_BLOCK_DAMAGE_BONUS = 1;
+// Value added to the next monster that receives a pending Curse.
+export const CURSED_MONSTER_VALUE_BONUS = 1;
+
+// Treasure gained when a Cursed Monster is slain before it attacks.
+export const CURSED_MONSTER_TREASURE_GAIN = 2;
 
 // Treasure gained when 寶 resolves.
 export const TREASURE_BLOCK_GAIN = 1;
 
-// Multiplier applied by each 勢 block to later slashes in the encounter.
-export const MOMENTUM_BLOCK_SLASH_MULTIPLIER = 2;
+// Number of Slashes converted to 必殺 by each 勢 block.
+export const MOMENTUM_BLOCK_INSTANT_SLASH_GAIN = 1;
 
-// Slash multiplier at the start of each encounter.
-export const INITIAL_ENCOUNTER_SLASH_MULTIPLIER = 1;
+// Intrinsic damage dealt by each ordinary 斬 before local or blessing bonuses.
+export const SLASH_INTRINSIC_DAMAGE = 1;
 
-// Curse bonus at the start of each encounter.
-export const INITIAL_ENCOUNTER_CURSE_BONUS = 0;
+// Persistent Guard at the start of a run.
+export const INITIAL_GUARD = 0;
 
-// Temporary shield at the start of each encounter.
-export const INITIAL_ENCOUNTER_SHIELD = 0;
+// Maximum persistent Guard that can be banked.
+export const MAX_GUARD = 6;
 
 // Temporary shield value of the 甲 block.
 export const ARMOR_BLOCK_VALUE = 1;
@@ -178,8 +184,11 @@ export const LOOT_TREASURE_GAIN = 1;
 // Body gained when 奪 grants healing.
 export const LOOT_BODY_GAIN = 1;
 
-// 劍法 gained when buying 磨鋒.
-export const SHARPEN_SWORD_SKILL_GAIN = 2;
+// Bounded Slash bonus gained when buying 磨鋒.
+export const SHARPEN_SWORD_SKILL_GAIN = 1;
+
+// Maximum Slash bonus from Sword blessings.
+export const MAX_SWORD_SKILL = 2;
 
 // 根骨 gained when buying 鍊體.
 export const TEMPER_BODY_MAX_BODY_GAIN = 2;
@@ -192,6 +201,9 @@ export const HEAVY_ARMOR_BLOCK_BONUS = 1;
 
 // Extra damage per 斬 when 連斬 sees more than one 斬 in an encounter.
 export const CHAIN_SLASH_DAMAGE_PER_SLASH = 1;
+
+// Maximum local bonus from 連斬.
+export const MAX_CHAIN_SLASH_BONUS = 1;
 
 // Treasure required to open the merchant after a round or encounter.
 export const MERCHANT_THRESHOLD = 10;

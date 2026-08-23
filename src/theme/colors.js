@@ -15,7 +15,7 @@ export const COLORS = {
     heal: "#5f8f68",
     sword: "#a8a8a8",
     slash: "#b33a3a",
-    curse: "#7f2f2f",
+    curse: "#4f78b7",
     treasure: "#bd9b2f",
     momentum: "#5f7fa8",
     armor: "#6f8798",

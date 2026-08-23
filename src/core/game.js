@@ -3,13 +3,16 @@ import {
   BOARD_SETTLE_ANIMATION_MS,
   BOARD_HEIGHT,
   BOARD_WIDTH,
+  CURSED_MONSTER_REVEAL_MS,
   DROP_MS,
   ENCOUNTER_GATE_EXIT_MS,
   HEAVY_ARMOR_BLOCK_BONUS,
   INITIAL_BODY,
+  INITIAL_GUARD,
   INITIAL_MAX_BODY,
   INITIAL_SWORD_SKILL,
   INITIAL_TREASURE,
+  MAX_SWORD_SKILL,
   MERCHANT_SKIP_COST,
   MONSTER_START_X,
   NORMAL_COLUMNS,
@@ -17,9 +20,9 @@ import {
   SHARPEN_SWORD_SKILL_GAIN,
   TEMPER_BODY_BODY_GAIN,
   TEMPER_BODY_MAX_BODY_GAIN,
-} from "./config.js?v=20260822-9";
-import { clearEncounter, startEncounter, updateEncounter as updateEncounterState } from "./encounterOrchestrator.js?v=20260822-16";
-import { canSkipMerchant, createMerchant, isModifierBlessing, moveMerchantSelectionIndex, shouldOpenMerchant } from "./merchant.js?v=20260821-46";
+} from "./config.js?v=20260822-20";
+import { clearEncounter, startEncounter, updateEncounter as updateEncounterState } from "./encounterOrchestrator.js?v=20260822-31";
+import { canSkipMerchant, createMerchant, isModifierBlessing, moveMerchantSelectionIndex, shouldOpenMerchant } from "./merchant.js?v=20260822-1";
 import { createMonsterPiece, createNormalPiece } from "./pieces.js?v=20260822-1";
 import { createRun, getNextRound, peekUpcomingBlocks } from "./runOrchestrator.js?v=20260822-1";
 
@@ -40,6 +43,8 @@ export function createGame() {
       maxBody: INITIAL_MAX_BODY,
       swordSkill: INITIAL_SWORD_SKILL,
       treasure: INITIAL_TREASURE,
+      guard: INITIAL_GUARD,
+      curseChain: createCurseChain(),
       blessings: [],
       blessingIds: [],
       armorValueBonus: 0,
@@ -165,6 +170,8 @@ export function updateEncounter(game, delta) {
 export function updateBoardAnimations(game, delta) {
   updatePendingRemovals(game, delta);
   updateDamageReveals(game, delta);
+  updateCurseReveals(game, delta);
+  updateInstantReveals(game, delta);
 
   if (game.encounterGate) {
     game.encounterGate.elapsed += delta;
@@ -194,6 +201,51 @@ export function updateBoardAnimations(game, delta) {
     game.settleGate = null;
     if (shouldResume) continueAfterSettling(game);
   }
+}
+
+function updateCurseReveals(game, delta) {
+  game.board.forEach((row) => {
+    row.forEach((block) => updateBlockCurseReveal(block, delta));
+  });
+  game.run.rounds.forEach((round) => {
+    round.forEach((block) => updateBlockCurseReveal(block, delta));
+  });
+}
+
+function updateBlockCurseReveal(block, delta) {
+  if (!block) return;
+
+  if (block.curseReveal) {
+    block.curseReveal.elapsed += delta;
+    if (block.curseReveal.elapsed >= block.curseReveal.duration) {
+      delete block.curseReveal;
+      block.curseRevealFade = {
+        elapsed: 0,
+        duration: CURSED_MONSTER_REVEAL_MS,
+      };
+    }
+    return;
+  }
+
+  if (!block.curseRevealFade) return;
+
+  block.curseRevealFade.elapsed += delta;
+  if (block.curseRevealFade.elapsed >= block.curseRevealFade.duration) {
+    delete block.curseRevealFade;
+  }
+}
+
+function updateInstantReveals(game, delta) {
+  game.board.forEach((row) => {
+    row.forEach((block) => {
+      if (!block?.instantRevealFade) return;
+
+      block.instantRevealFade.elapsed += delta;
+      if (block.instantRevealFade.elapsed >= block.instantRevealFade.duration) {
+        delete block.instantRevealFade;
+      }
+    });
+  });
 }
 
 function updatePendingRemovals(game, delta) {
@@ -310,6 +362,12 @@ function spawnRound(game) {
   }
 }
 
+function createCurseChain() {
+  return {
+    phase: "inactive",
+  };
+}
+
 function dropActive(game, lane) {
   const piece = game.active[lane];
   if (!piece) return false;
@@ -424,7 +482,7 @@ function applyBlessing(game, blessing) {
   }
 
   if (blessing.id === "sharpen") {
-    game.player.swordSkill += SHARPEN_SWORD_SKILL_GAIN;
+    game.player.swordSkill = Math.min(MAX_SWORD_SKILL, game.player.swordSkill + SHARPEN_SWORD_SKILL_GAIN);
   }
 
   if (blessing.id === "temperBody") {
