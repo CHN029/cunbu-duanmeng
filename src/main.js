@@ -22,8 +22,8 @@ import {
   togglePause,
   updateBoardAnimations,
   updateEncounter,
-} from "./core/game.js?v=20260825-4";
-import { createCanvasRenderer } from "./renderers/canvasRenderer.js?v=20260825-112";
+} from "./core/game.js?v=20260825-5";
+import { createCanvasRenderer } from "./renderers/canvasRenderer.js?v=20260825-113";
 import { COLORS } from "./theme/colors.js?v=20260825-23";
 import { bindInput, bindSwipeInput } from "./ui/input.js?v=20260825-2";
 import { toChineseNumber } from "./ui/chineseNumbers.js?v=20260821-1";
@@ -350,9 +350,10 @@ function getExpandEffectVisual(center, progress) {
 
 function renderPanelEffects() {
   const hasBodyShake = hasActiveUiEffect("body", "shake");
+  const hasBoardShake = hasBodyShake || hasActiveUiEffect("board", "shake");
 
   bodyMeter.classList.toggle("hp-shake", hasBodyShake);
-  canvas.classList.toggle("board-shake", hasBodyShake);
+  canvas.classList.toggle("board-shake", hasBoardShake);
 }
 
 function hasActiveUiEffect(target, type) {

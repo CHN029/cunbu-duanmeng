@@ -394,6 +394,7 @@ function takeDamage(game, event) {
 
   game.player.guard -= shieldedDamage;
   game.player.body -= finalDamage;
+  if (incomingDamage > 0) addUiEffect(game, { type: "shake", target: "board" });
   if (finalDamage > 0) addUiEffect(game, { type: "shake", target: "body" });
 
   if (game.player.body <= 0) {

@@ -763,13 +763,14 @@ function drawOverlay(context, canvas, game, pauseProgress = 0) {
 function drawPauseBookmark(context, canvas, label) {
   const cssWidth = canvas.getBoundingClientRect().width;
   const pixelRatio = window.devicePixelRatio || 1;
+  const isNarrow = cssWidth <= 280;
   context.save();
   context.translate(0, -10 * pixelRatio);
-  const fontSize = (cssWidth <= 280 ? 46 : 36) * pixelRatio;
+  const fontSize = 36 * pixelRatio;
   const textHeight = fontSize + (label.length - 1) * fontSize * 1.08;
   const ornamentWidth = 48 * pixelRatio;
   const ornamentHeight = 22 * pixelRatio;
-  const outerPadding = 42 * pixelRatio;
+  const outerPadding = (isNarrow ? 2.5 : 42) * pixelRatio;
   const frameHeight = textHeight + 2 * (ornamentHeight + 14 * pixelRatio) + outerPadding * 2;
   const centerX = canvas.width / 2;
   const centerY = canvas.height / 2;
@@ -782,7 +783,7 @@ function drawPauseBookmark(context, canvas, label) {
 
   drawBookmarkOrnament(context, centerX, frameTop + outerPadding, ornamentWidth, ornamentHeight, pixelRatio, false, pauseInk);
   drawBookmarkOrnament(context, centerX, frameTop + frameHeight - outerPadding, ornamentWidth, ornamentHeight, pixelRatio, true, pauseInk);
-  drawVerticalLabel(context, canvas, label, `400`, `"Zhaohua", serif`, pauseInk);
+  drawVerticalLabel(context, canvas, label, `400`, `"Zhaohua", serif`, pauseInk, fontSize);
   context.restore();
 }
 
@@ -823,12 +824,12 @@ function drawBookmarkOrnament(context, centerX, edgeY, width, height, pixelRatio
   context.restore();
 }
 
-function drawVerticalLabel(context, canvas, label, weight = `500`, family = `"Huiwen-Fangsong", "STFangsong", "Songti TC", serif`, color = COLORS.ink) {
+function drawVerticalLabel(context, canvas, label, weight = `500`, family = `"Huiwen-Fangsong", "STFangsong", "Songti TC", serif`, color = COLORS.ink, size = null) {
   const centerX = Math.round(canvas.width / 2);
   const centerY = Math.round(canvas.height / 2);
   const cssWidth = canvas.getBoundingClientRect().width;
   const pixelRatio = window.devicePixelRatio || 1;
-  const fontSize = cssWidth <= 280 ? 46 * pixelRatio : 36 * pixelRatio;
+  const fontSize = size ?? (cssWidth <= 280 ? 46 * pixelRatio : 36 * pixelRatio);
   const gap = fontSize * 1.08;
   const startY = centerY - ((label.length - 1) * gap) / 2;
 

@@ -143,6 +143,7 @@ assert.equal(Object.values(MONSTER_COUNT_PERCENTAGES).reduce((sum, value) => sum
   resolveEncounter(game, { updateUi: false });
   assert.equal(game.player.body, 6, "Armor should protect before UI animation effects advance.");
   assert.equal(game.player.guard, 0, "Armor protection should be spent by the monster attack.");
+  assert.equal(game.uiEffects.some(({ type, target }) => type === "shake" && target === "board"), true, "An armor-blocked monster attack should still shake the board.");
 }
 
 {

@@ -26,7 +26,7 @@ import {
   TEMPER_BODY_MAX_BODY_GAIN,
   UPCOMING_BLOCK_PREVIEW_COUNT,
 } from "./config.js?v=20260824-3";
-import { clearEncounter, startEncounter, updateEncounter as updateEncounterState } from "./encounterOrchestrator.js?v=20260825-4";
+import { clearEncounter, startEncounter, updateEncounter as updateEncounterState } from "./encounterOrchestrator.js?v=20260825-5";
 import { canSkipMerchant, createMerchant, isModifierBlessing, moveMerchantSelectionIndex, shouldOpenMerchant } from "./merchant.js?v=20260824-1";
 import { createMonsterPiece, createNormalPiece } from "./pieces.js?v=20260824-1";
 import { createRun, getDifficultyPhase, getNextRound, peekUpcomingBlocks } from "./runOrchestrator.js?v=20260825-3";

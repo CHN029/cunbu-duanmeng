@@ -283,10 +283,10 @@ canvas.board-shake {
 
 @keyframes board-hit-shake {
   0%, 100% { transform: translate(0, 0); }
-  18% { transform: translate(-4px, 1px); }
-  36% { transform: translate(3px, -1px); }
-  54% { transform: translate(-2px, 1px); }
-  72% { transform: translate(1px, 0); }
+  18% { transform: translate(-7px, 2px); }
+  36% { transform: translate(6px, -2px); }
+  54% { transform: translate(-4px, 1px); }
+  72% { transform: translate(2px, -1px); }
 }
 
 .side-panel {
