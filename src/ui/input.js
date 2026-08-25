@@ -1,34 +1,19 @@
 import {
   activateMerchantSelection,
   chooseMerchantOption,
-  createGame,
   hardDrop,
   move,
   moveMerchantSelection,
   rotate,
   skipMerchant,
   togglePause,
-} from "../core/game.js?v=20260822-40";
+} from "../core/game.js?v=20260825-3";
 
 export function bindInput(getGame, setGame, onChange) {
   window.addEventListener("keydown", (event) => {
     if (event.metaKey || event.ctrlKey || event.altKey) return;
 
     const game = getGame();
-    const startKeys = {
-      Enter: true,
-      " ": true,
-      r: true,
-      R: true,
-    };
-
-    if (!game && startKeys[event.key]) {
-      event.preventDefault();
-      setGame(createGame());
-      onChange();
-      return;
-    }
-
     if (!game) return;
 
     const merchantActions = {

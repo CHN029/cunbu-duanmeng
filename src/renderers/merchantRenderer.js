@@ -1,12 +1,12 @@
 import { toChineseNumber } from "../ui/chineseNumbers.js?v=20260821-1";
-import { COLORS } from "../theme/colors.js?v=20260821-19";
+import { COLORS } from "../theme/colors.js?v=20260825-23";
 
 export function drawMerchant(context, canvas, merchant) {
   const layout = getMerchantLayout(canvas, merchant.options.length);
   const scale = canvas.width / 300;
 
   context.save();
-  context.fillStyle = COLORS.white;
+  context.fillStyle = COLORS.paper;
   context.fillRect(0, 0, canvas.width, canvas.height);
 
   drawVerticalText(context, "福臨", layout.titleLeftX, canvas.height * 0.13, {

@@ -1,4 +1,4 @@
-import { EFFECT_MS } from "./config.js?v=20260822-15";
+import { EFFECT_MS } from "./config.js?v=20260824-3";
 
 export function addEffect(game, effect) {
   game.effects.push({

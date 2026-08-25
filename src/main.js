@@ -6,7 +6,8 @@ import {
   MONSTER_DROP_MS,
   MONSTER_FALL_STEP_ANIMATION_MS,
   NORMAL_COLUMNS,
-} from "./core/config.js?v=20260822-24";
+  UPCOMING_BLOCK_PREVIEW_COUNT,
+} from "./core/config.js?v=20260824-3";
 import {
   canMonstersDrop,
   canMove,
@@ -19,16 +20,16 @@ import {
   tick,
   tickMonsters,
   updateBoardAnimations,
-  togglePause,
   updateEncounter,
-} from "./core/game.js?v=20260822-40";
-import { createCanvasRenderer } from "./renderers/canvasRenderer.js?v=20260822-92";
-import { COLORS } from "./theme/colors.js?v=20260821-19";
-import { bindInput, bindSwipeInput } from "./ui/input.js?v=20260821-53";
+} from "./core/game.js?v=20260825-4";
+import { createCanvasRenderer } from "./renderers/canvasRenderer.js?v=20260825-100";
+import { COLORS } from "./theme/colors.js?v=20260825-23";
+import { bindInput, bindSwipeInput } from "./ui/input.js?v=20260825-2";
 import { toChineseNumber } from "./ui/chineseNumbers.js?v=20260821-1";
-import { updateUiEffects } from "./core/uiEffects.js?v=20260822-4";
+import { updateUiEffects } from "./core/uiEffects.js?v=20260824-1";
 
 const uiEffects = document.querySelector("#ui-effects");
+const cover = document.querySelector("#cover");
 const canvas = document.querySelector("#game");
 const upcoming = document.querySelector("#upcoming");
 const round = document.querySelector("#round");
@@ -36,7 +37,6 @@ const bodyMeter = document.querySelector("#body-meter");
 const treasure = document.querySelector("#treasure");
 const blessings = document.querySelector("#blessings");
 const newRun = document.querySelector("#new-run");
-const pauseRun = document.querySelector("#pause-run");
 const showShop = document.querySelector("#show-shop");
 
 const ROLL_STEP_MS = 130;
@@ -48,12 +48,13 @@ let uiTime = 0;
 let dropCounter = 0;
 let monsterDropCounter = 0;
 let upcomingKey = "";
+let runReadyAt = 0;
 const rollingStats = {
   treasure: createRollingStat(),
 };
 
 bindInput(
-  () => game,
+  () => (uiTime >= runReadyAt ? game : null),
   (nextGame) => {
     game = nextGame;
     dropCounter = 0;
@@ -61,9 +62,10 @@ bindInput(
   },
   render,
 );
-bindSwipeInput(document.body, () => game, render);
+bindSwipeInput(document.body, () => (uiTime >= runReadyAt ? game : null), render);
+cover.addEventListener("click", dismissCover);
+document.addEventListener("keydown", dismissCover);
 newRun.addEventListener("click", handleNewRun);
-pauseRun.addEventListener("click", pause);
 showShop.addEventListener("click", openShopPreview);
 canvas.addEventListener("click", handleCanvasClick);
 
@@ -73,9 +75,10 @@ function loop(time) {
   const delta = time - lastTime;
   lastTime = time;
   uiTime = time;
-  const running = game && !game.paused && !game.gameOver && !game.runComplete && !game.encounterGate && !game.merchant;
+  const ready = game && time >= runReadyAt;
+  const running = ready && !game.paused && !game.gameOver && !game.runComplete && !game.encounterGate && !game.merchant;
 
-  if (game && !game.paused) {
+  if (ready && !game.paused) {
     updateUiEffects(game, delta);
     updateBoardAnimations(game, delta);
   }
@@ -120,7 +123,7 @@ function render() {
   const monsterDropProgress = running && !game.encounter && canMonstersDrop(game) ? getMonsterStepDropProgress(monsterDropCounter) : 0;
 
   renderer.draw(game, { normalDropProgress, monsterDropProgress });
-  round.textContent = `第${toChineseNumber(Math.min(game.run.currentRound, game.run.totalRounds))}回`;
+  round.textContent = `第${toChineseNumber(getEncounterDisplayCount())}回`;
   newRun.textContent = "週而復始";
   renderBodyMeter();
   renderRollingStat(treasure, rollingStats.treasure, getVisibleTreasure());
@@ -128,7 +131,6 @@ function render() {
   renderBlessings();
   renderUiEffects();
   renderPanelEffects();
-  renderPauseButton();
 }
 
 function renderIdle() {
@@ -139,7 +141,7 @@ function renderIdle() {
   resetRollingStats();
   treasure.textContent = "無";
   upcomingKey = "";
-  upcoming.replaceChildren(...Array.from({ length: 6 }, () => {
+  upcoming.replaceChildren(...Array.from({ length: UPCOMING_BLOCK_PREVIEW_COUNT }, () => {
     const slot = document.createElement("span");
     slot.className = "upcoming-slot empty";
     return slot;
@@ -148,7 +150,6 @@ function renderIdle() {
   uiEffects.replaceChildren();
   renderPanelEffects();
   newRun.textContent = "週而復始";
-  renderPauseButton();
 }
 
 function getStepDropProgress(elapsed) {
@@ -185,7 +186,7 @@ function renderBlessings() {
     ...getBlessingStacks(game.player.blessings).map(({ label, count }) => (count > 1 ? `${label}${toChineseNumber(count)}` : label)),
   ];
 
-  const curseTag = getCurseTag(game.player.curseChain);
+  const curseTag = getCurseTag(game.player.pendingCurses);
   if (curseTag) tags.push(curseTag);
 
   if (tags.length === 0) {
@@ -201,10 +202,6 @@ function renderBlessings() {
       return tag;
     }),
   );
-}
-
-function renderPauseButton() {
-  pauseRun.hidden = !game || game.paused || game.gameOver || game.runComplete || game.merchant;
 }
 
 function renderUiEffects() {
@@ -445,22 +442,21 @@ function getBlessingStacks(labels) {
   return Array.from(stacks, ([label, count]) => ({ label, count }));
 }
 
-function getCurseTag(curseChain) {
-  if (!curseChain || curseChain.phase === "inactive") return "";
+function getCurseTag(pendingCurses) {
+  if (!pendingCurses) return "";
   if (hasActiveUiEffect("curse", "travel")) return "";
-  if (curseChain.phase === "pendingMonster") return "呪";
-  return "";
+  return pendingCurses > 1 ? `呪${toChineseNumber(pendingCurses)}` : "呪";
 }
 
 function renderUpcoming() {
-  const blocks = getUpcomingBlocks(game, 6);
+  const blocks = getUpcomingBlocks(game);
   const nextKey = `${game.run.currentRound}|${blocks.map((block) => `${block.type}${block.cursedMonster ? "!" : ""}${block.curseReveal ? "~" : ""}`).join("-")}`;
   if (nextKey === upcomingKey) return;
 
   upcomingKey = nextKey;
 
   upcoming.replaceChildren(
-    ...Array.from({ length: 6 }, (_, index) => {
+    ...Array.from({ length: UPCOMING_BLOCK_PREVIEW_COUNT }, (_, index) => {
       const slot = document.createElement("span");
       const block = blocks[index];
       slot.className = `upcoming-slot${block ? "" : " empty"}`;
@@ -475,6 +471,12 @@ function renderUpcoming() {
       return slot;
     }),
   );
+}
+
+function getEncounterDisplayCount() {
+  if (!game) return 1;
+  if (game.runComplete) return game.completedEncounters;
+  return game.completedEncounters + 1;
 }
 
 function getBlockCornerColor(block) {
@@ -502,8 +504,10 @@ function handleNewRun() {
   startRun();
 }
 
-function startRun() {
+function startRun(readyDelay = 0) {
+  document.body.classList.remove("is-cover-exiting");
   game = createGame();
+  runReadyAt = performance.now() + readyDelay;
   dropCounter = 0;
   monsterDropCounter = 0;
   upcomingKey = "";
@@ -511,11 +515,13 @@ function startRun() {
   render();
 }
 
-function pause() {
-  if (!game || game.gameOver || game.runComplete || game.merchant) return;
+function dismissCover(event) {
+  if (game || !document.body.classList.contains("is-idle") || document.body.classList.contains("is-cover-exiting")) return;
+  if (event.type === "keydown" && (event.metaKey || event.ctrlKey || event.altKey)) return;
 
-  togglePause(game);
-  render();
+  event.preventDefault();
+  document.body.classList.add("is-cover-exiting");
+  setTimeout(() => startRun(1300), 900);
 }
 
 function openShopPreview() {

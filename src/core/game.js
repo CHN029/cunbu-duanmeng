@@ -1,4 +1,4 @@
-import { collides, createBoard, isNormalBottomRowFull, rotatePiece, settleBoard, settleBoardColumns, shiftPiece } from "./board.js?v=20260822-2";
+import { collides, createBoard, isNormalBottomRowFull, rotatePiece, settleBoard, settleBoardColumns, shiftPiece } from "./board.js?v=20260824-1";
 import {
   BOARD_SETTLE_ANIMATION_MS,
   BOARD_HEIGHT,
@@ -9,11 +9,14 @@ import {
   HEAVY_ARMOR_BLOCK_BONUS,
   INSTANT_SLASH_REVEAL_MS,
   INITIAL_BODY,
+  INITIAL_ARMOR_VALUE_BONUS,
   INITIAL_GUARD,
   INITIAL_MAX_BODY,
+  INITIAL_PENDING_CURSES,
   INITIAL_SWORD_SKILL,
   INITIAL_TREASURE,
   MAX_SWORD_SKILL,
+  MERCHANT_PURCHASE_COST,
   MERCHANT_SKIP_COST,
   MONSTER_START_X,
   NORMAL_COLUMNS,
@@ -21,11 +24,12 @@ import {
   SHARPEN_SWORD_SKILL_GAIN,
   TEMPER_BODY_BODY_GAIN,
   TEMPER_BODY_MAX_BODY_GAIN,
-} from "./config.js?v=20260822-24";
-import { clearEncounter, startEncounter, updateEncounter as updateEncounterState } from "./encounterOrchestrator.js?v=20260822-39";
-import { canSkipMerchant, createMerchant, isModifierBlessing, moveMerchantSelectionIndex, shouldOpenMerchant } from "./merchant.js?v=20260822-1";
-import { createMonsterPiece, createNormalPiece } from "./pieces.js?v=20260822-1";
-import { createRun, getNextRound, peekUpcomingBlocks } from "./runOrchestrator.js?v=20260822-4";
+  UPCOMING_BLOCK_PREVIEW_COUNT,
+} from "./config.js?v=20260824-3";
+import { clearEncounter, startEncounter, updateEncounter as updateEncounterState } from "./encounterOrchestrator.js?v=20260825-4";
+import { canSkipMerchant, createMerchant, isModifierBlessing, moveMerchantSelectionIndex, shouldOpenMerchant } from "./merchant.js?v=20260824-1";
+import { createMonsterPiece, createNormalPiece } from "./pieces.js?v=20260824-1";
+import { createRun, getDifficultyPhase, getNextRound, peekUpcomingBlocks } from "./runOrchestrator.js?v=20260825-3";
 
 export function createGame() {
   const game = {
@@ -45,12 +49,13 @@ export function createGame() {
       swordSkill: INITIAL_SWORD_SKILL,
       treasure: INITIAL_TREASURE,
       guard: INITIAL_GUARD,
-      curseChain: createCurseChain(),
+      pendingCurses: INITIAL_PENDING_CURSES,
       blessings: [],
       blessingIds: [],
-      armorValueBonus: 0,
+      armorValueBonus: INITIAL_ARMOR_VALUE_BONUS,
     },
     dropMs: DROP_MS,
+    completedEncounters: 0,
     gameOver: false,
     paused: false,
     runComplete: false,
@@ -68,8 +73,8 @@ export function createGame() {
   return game;
 }
 
-export function getUpcomingBlocks(game, count = 6) {
-  return peekUpcomingBlocks(game.run, count);
+export function getUpcomingBlocks(game, count = UPCOMING_BLOCK_PREVIEW_COUNT) {
+  return peekUpcomingBlocks(game.run, count, getCurrentDifficultyPhase(game));
 }
 
 export function tick(game) {
@@ -313,7 +318,9 @@ export function chooseMerchantOption(game, index) {
   const resumeWithNewRound = game.merchant.resumeWithNewRound;
   if (!game.merchant.preview) {
     applyBlessing(game, option);
-    game.player.treasure = 0;
+    game.player.treasure = MERCHANT_PURCHASE_COST == null
+      ? 0
+      : Math.max(0, game.player.treasure - MERCHANT_PURCHASE_COST);
   }
   game.merchant = null;
   if (resumeWithNewRound) spawnRound(game);
@@ -355,7 +362,7 @@ export function openMerchantPreview(game) {
 }
 
 function spawnRound(game) {
-  const round = getNextRound(game.run);
+  const round = getNextRound(game.run, getCurrentDifficultyPhase(game));
 
   if (!round) {
     game.runComplete = true;
@@ -375,12 +382,6 @@ function spawnRound(game) {
   if (game.active.monsters && collides(game.board, shiftPiece(game.active.monsters, 0, 1), MONSTER_START_X, BOARD_WIDTH - 1)) {
     game.gameOver = true;
   }
-}
-
-function createCurseChain() {
-  return {
-    phase: "inactive",
-  };
 }
 
 function dropActive(game, lane) {
@@ -440,12 +441,17 @@ function lockActive(game, lane) {
 
 function finishEncounter(game) {
   clearEncounter(game);
+  game.completedEncounters += 1;
   game.encounterGate = {
     phase: "opening",
     elapsed: 0,
     duration: ENCOUNTER_GATE_EXIT_MS,
     resumeAfter: true,
   };
+}
+
+function getCurrentDifficultyPhase(game) {
+  return getDifficultyPhase(game.completedEncounters);
 }
 
 function continueAfterEncounter(game) {

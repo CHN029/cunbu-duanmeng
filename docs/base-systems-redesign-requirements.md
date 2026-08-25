@@ -1,43 +1,39 @@
-# Curse Chain Redesign Handoff
+# Queued Curse Bounty Handoff
 
 ## Status
 
-Accepted design direction for the next implementation agent. This document replaces the previous
-Armor, Doom, Sword-block, and general base-system redesign discussion. Those systems have already
-been prototyped; do not reopen them as part of this task.
+Accepted and implemented direction for the base combat prototype. This document replaces the
+discarded delayed Doom and Cursed Slash designs.
 
-The existing code is the source of truth for current behavior. Other design documents may lag
-behind the implementation.
+The code is the source of truth for current behavior. Future work should preserve this Curse timing
+through the first balance and blessing phases unless playtesting demonstrates a structural problem.
 
-## Mission
+## Core Mechanism
 
-Replace the current delayed Doom wager with a short, finite Curse chain:
+The game is organized around:
+
+> Queue -> Commit -> Resolve.
+
+Curse strengthens this mechanism across two encounters:
 
 ```text
-Curse block
-    -> next monster becomes a Cursed Monster
-    -> slaying it creates one Cursed Slash
-    -> that Slash resolves with +1 damage
-    -> chain ends
+Encounter A
+Curse resolves -> moves to the side as a pending charge
+
+Encounter B
+one pending charge infects the front monster before resolution
+-> Cursed Monster gains +1 value
+-> slay it for +2 treasure
+-> or let it survive and receive no bounty
 ```
 
 Design shorthand:
 
-> Accept a harder monster now to earn one stronger Slash later.
-
-The chain should strengthen the existing core mechanism:
-
-> Queue -> Commit -> Resolve.
-
-It must remain easy to predict from the board and upcoming-block display. Do not add monster-specific
-traits, separate monster health and damage, block-combination recipes, permanent Curse possession,
-or a repeating transfer loop.
+> Accept a future harder monster for a visible treasure bounty.
 
 ## Established Combat Baseline
 
-Preserve the current accepted base rules unless this Curse chain strictly requires a small change:
-
-- A monster's remaining value is both its remaining health and its attack damage.
+- A monster's remaining value is both its remaining health and attack damage.
 - Slash has nonzero intrinsic damage.
 - Slash damage follows:
 
@@ -47,193 +43,136 @@ Preserve the current accepted base rules unless this Curse chain strictly requir
 
 - Armor grants capped persistent Guard.
 - Guard absorbs incoming monster damage and persists until consumed, subject to its cap.
-- Momentum can slay a front monster through the existing instant-Slash behavior.
-- Sword blocks do not appear in normal block generation.
-- Support effects resolve before Slashes, and Slashes resolve before monster attacks.
+- Momentum can turn a paired Slash into an instant front-monster kill.
+- Sword blocks do not appear in normal generation.
+- Support resolves before Slash, and Slash resolves before monster attacks.
+- Core outcomes must never depend on animation timing.
 
-The new Cursed Slash bonus is a one-use local bonus. It is not Sword Skill and must not create
-permanent Slash scaling.
+## Required Curse Rules
 
-## Required Curse Chain
+### Resolving Curse
 
-### 1. Curse block creates a pending Curse
+- Every resolved `呪` adds one pending Curse charge.
+- The charge moves visibly from the encounter row to the side panel.
+- A Curse resolved in an encounter does **not** infect a monster in that same encounter.
+- This delay is intentional: Curse already occupies one of the four current combat blocks, so it
+  must not also strengthen the current threat.
+- Encounters without monsters preserve all pending charges.
 
-- Resolving `呪` creates one pending Curse chain.
-- If the current encounter has no valid monster, the Curse waits for the next applicable monster.
-- The pending state must be visible to the player.
-- Empty encounters must not discard the Curse.
+### Queued charges
 
-### 2. The next monster becomes a Cursed Monster
+- Pending Curse is a non-negative count, not a single active-chain flag.
+- Multiple Curse blocks may resolve in one row and each adds one charge.
+- There is no arbitrary cap in the first prototype; measure naturally occurring queue sizes during
+  simulations before adding one.
+- Display one charge as `呪` and multiple charges as `呪` plus the count.
 
-- Before Slash activation, the pending Curse attaches to the next monster that would attack.
-- For the prototype, a Cursed Monster has exactly `+1 value`.
-- Because monster value remains unified, this increases both its initial durability and its
-  potential attack damage through the existing remaining-value rule.
-- The monster must have an unmistakable cursed visual state before damage resolves.
-- Displayed value and resolved value must match.
-- Do not add a separate Doom damage bonus on top of the increased monster value.
+### Infecting a monster
 
-When multiple monsters are present, use the existing front-monster targeting order. Do not add a
-new target-selection interface for this prototype.
+- At the start of an encounter containing monsters, consume at most one pending Curse charge.
+- Infect the front monster using the existing front-target order.
+- Infection happens before support, Slash, and monster-attack resolution.
+- A second monster in the same encounter is not infected by another queued charge.
+- Remaining charges wait for later applicable encounters.
+- A Curse block resolving during the infected encounter joins the pending queue for a later
+  encounter.
 
-### 3. Slaying the Cursed Monster creates one Cursed Slash
+### Cursed Monster
 
-- If the Cursed Monster is slain before it attacks, create exactly one Cursed Slash reward.
-- Slaying it by ordinary Slash, accumulated Slash damage, Momentum, or another legitimate combat
-  effect must count consistently.
-- The reward applies to a future Slash, not to another Slash in the encounter that earned it.
-- No treasure, healing, or additional bounty is granted by this chain.
-- If the Cursed Monster survives to attack, no Cursed Slash is created and the chain ends.
-- Guard may absorb the failed Cursed Monster's attack, but Guard does not count as slaying it and
-  cannot earn the reward.
+- A Cursed Monster gains exactly `+1 value` for the prototype.
+- Because monster value is unified, this increases durability and potential attack damage through
+  the existing remaining-value rule.
+- The increased value must be applied in core logic and displayed before combat resolves.
+- The monster must have a clear cursed visual state.
+- Do not add separate Doom damage or unique cursed-monster traits.
 
-### 4. The next Slash becomes a Cursed Slash
+### Success and failure
 
-- Mark the next available future Slash as Cursed as soon as it can be identified.
-- The marked Slash must be visible in the upcoming stream and on the board.
-- A Cursed Slash deals exactly `+1 damage` through the shared core Slash-damage calculation.
-- The bonus applies once to that Slash block only.
-- When the Cursed Slash resolves, the chain ends whether or not it hits or slays a monster.
-- Resolving it in an encounter without monsters spends the bonus. This keeps commitment timing
-  relevant and avoids an invisible banked damage modifier.
-- A Cursed Slash cannot create another Cursed Monster or another Cursed Slash.
-
-## Chain Lifetime and Multiplicity
-
-The first prototype supports only one active Curse chain at a time.
-
-An active chain is any of:
-
-- a pending Curse waiting for a monster;
-- a Cursed Monster waiting to resolve;
-- a Cursed Slash waiting to resolve.
-
-Do not allow another Curse block to resolve into a second chain while one is active. Prevent or
-replace additional Curse blocks before they become a dead player choice; do not silently consume a
-Curse block with no effect. Keep the suppression or replacement rule explicit and deterministic.
-
-The Curse bonus is fixed at `+1`. It does not stack, level up, or persist after the Cursed Slash
-resolves.
-
-## State and Resolution Requirements
-
-- Represent the chain with an explicit core state; do not infer it solely from animation objects or
-  rendered labels.
-- A monster and Slash should carry explicit cursed identity while affected.
-- Apply all value and damage changes in core combat logic before their animations play.
-- Animation timing must never determine whether the Curse, monster value increase, kill reward, or
-  Cursed Slash bonus is applied.
-- Cleanup must remove stale cursed flags after the relevant monster or Slash resolves.
-- Starting, finishing, pausing, or cascading encounters must not duplicate or lose the chain.
-- Game over ends the run normally; no special Curse cleanup beyond ordinary run disposal is needed.
-
-Suggested conceptual states:
-
-```text
-inactive
-pendingMonster
-cursedMonster
-```
-
-The implementation may use different names, but equivalent lifetimes must be explicit and
-testable.
+- Slaying the Cursed Monster before it attacks grants exactly `+2 treasure`.
+- Ordinary Slash, accumulated Slash damage, Momentum, and other legitimate kills must grant the
+  same bounty.
+- The bounty belongs to the cursed target: killing it earns the reward even if another monster in
+  the encounter survives.
+- If the Cursed Monster survives to attack, it grants no treasure.
+- Guard may absorb its attack but cannot earn the bounty.
+- The consumed charge ends after either success or failure and never returns.
+- There is no Cursed Slash reward or continuing Curse chain.
 
 ## Player Communication
 
-The complete chain should be understandable without opening documentation:
+The complete rule must be understandable in play:
 
-- Pending Curse: show that a future monster will be cursed.
-- Cursed Monster: distinct mark plus its already-increased value.
-- Successful slay: visibly transfer the Curse reward toward the upcoming Slash stream.
-- Cursed Slash: distinct mark and displayed damage including `+1`.
-- Failed slay: visibly end the chain without implying that a reward remains pending.
-- Cursed Slash resolution: visibly consume the cursed state.
+- Resolving `呪` visibly transfers it to the side.
+- The side displays the pending count.
+- At the next monster encounter, one Curse visibly travels to the front monster.
+- The Cursed Monster displays its already-increased value.
+- A successful kill visibly awards two treasure.
+- Failure removes the infected monster normally and does not imply that a reward remains.
+- If more Curse charges remain, the side count stays visible after one is consumed.
 
-Keep the presentation compact and consistent with the existing glyph-and-dot visual language. Broad
-UI or art-direction changes are out of scope.
+Keep presentation consistent with the existing glyph-and-dot language. Broad UI redesign is out of
+scope.
 
-## Deterministic Prototype Scenarios
+## Deterministic Scenarios
 
-Add rule-level tests covering at least:
+Rule-level tests must cover:
 
-1. Curse resolves without a monster and remains pending.
-2. Pending Curse attaches to the next front monster before Slash damage.
-3. A value-1 monster becomes value 2 when cursed.
-4. Cursed Monster survives, attacks with its remaining value, and produces no Cursed Slash.
-5. Guard absorbs some or all of a surviving Cursed Monster's attack without earning the reward.
-6. Ordinary Slash slays a Cursed Monster and creates exactly one future Cursed Slash.
-7. Momentum slays a Cursed Monster and creates the same reward.
-8. The reward does not empower a later Slash in the same encounter.
-9. The next future Slash is visibly marked and resolves with exactly `+1 damage`.
-10. A Cursed Slash resolving without a monster is consumed.
-11. A Cursed Slash resolves once and cannot continue or restart the chain.
-12. Multiple monsters use the existing front-target order for Curse attachment.
-13. Consecutive or cascade encounters preserve the correct chain state.
-14. A second Curse cannot create a concurrent chain or disappear as a no-effect block.
-15. Displayed monster value and Slash damage match the applied core values.
+1. One ordinary Slash versus a value-1 monster.
+2. Momentum plus Slash against multiple monsters.
+3. Persistent Guard in an empty encounter.
+4. Guard applying correctly without UI animation updates.
+5. Curse resolving in an empty encounter and remaining pending.
+6. An empty encounter preserving multiple queued Curses.
+7. Curse and monster in the same row: the current monster remains ordinary and Curse queues.
+8. The next monster encounter consuming exactly one queued Curse.
+9. The front monster receiving `+1 value` before resolution.
+10. A surviving Cursed Monster attacking with increased remaining value and granting no bounty.
+11. Guard absorbing that attack without earning treasure.
+12. Multiple monsters: only the front monster is infected.
+13. Ordinary Slash killing a Cursed Monster for exactly two treasure.
+14. Momentum killing a Cursed Monster for the same bounty.
+15. Killing the cursed target while another monster survives still granting the bounty.
+16. Two Curse blocks in one row adding two pending charges.
+17. A newly resolved Curse during a cursed encounter queueing for a later encounter.
 
-Tests must validate player health, Guard, monster values, cursed identities, chain state, resulting
-Slash damage, and cleanup after resolution.
+Tests must validate player health, Guard, monster values and identity, treasure, pending Curse count,
+front-target order, and cleanup.
 
-## Implementation Areas
+## Implementation Constraints
 
-Inspect the current code before editing. Likely areas include:
-
-- `src/core/config.js`
-- `src/core/blockTypes.js`
-- `src/core/combatRules.js`
-- `src/core/encounterOrchestrator.js`
-- `src/core/runOrchestrator.js`
-- `src/core/pieces.js`
-- `src/core/game.js`
-- `src/renderers/canvasRenderer.js`
-- `src/main.js`
-- `tests/combatPrototype.test.mjs`
-
-Keep rule ownership in core modules. Rendering should only visualize resolved state.
+- Keep state transitions and calculations in core modules, not renderers.
+- Apply Guard, Curse, monster value, damage, and treasure independently of animation timing.
+- Consume at most one pending charge per monster encounter.
+- Do not silently discard additional Curse blocks.
+- Do not infect a same-row monster with a newly resolved Curse.
+- Preserve existing board placement and input behavior.
+- Preserve the shared Slash-damage source used by resolution and display.
+- Do not tune final percentages, monster curves, or blessing power in this implementation task.
 
 ## Out of Scope
 
-- Unique monster traits or behaviors.
-- Separate health and attack statistics.
-- Permanent or endlessly transferring Curse.
-- Curse-to-block adjacency or block-combination recipes.
-- Cursed Armor or Curse interactions with every block type.
-- Multiple simultaneous Curse chains.
-- Stackable Curse strength.
-- New treasure rewards for cursed kills.
-- Final Curse frequency, monster curve, or full-run numerical balance.
+- Cursed Slash.
+- Endless Curse transfer.
+- Same-row Curse infection.
+- Stacking several Curse bonuses on one monster.
+- Unique monster traits.
+- Separate health and attack values.
+- Curse/block adjacency recipes.
+- Final Curse frequency or merchant-economy balance.
 - Broad blessing redesign.
-- Broad combat, UI, input, or board-placement refactors.
-
-## Deliverables
-
-The implementing agent should provide:
-
-1. A playable finite Curse chain matching this document.
-2. Core state and cleanup rules for every chain phase.
-3. Cursed Monster and Cursed Slash presentation in the board and upcoming stream.
-4. Deterministic tests for the required scenarios.
-5. A short validation record explaining whether the chain changes encounter timing and future-row
-   planning.
-6. A list of removed or deprecated Doom state, constants, UI labels, and code paths.
-7. A note describing how additional Curse blocks are prevented or replaced while a chain is active.
-8. No final balance claims unless supported by repeatable simulations.
 
 ## Acceptance Criteria
 
-The redesign is ready when:
+The system is ready when:
 
-- Curse reliably follows `Curse -> Cursed Monster -> Cursed Slash -> end`.
-- The affected monster is cursed before Slash activation.
-- A Cursed Monster uses the existing unified value rule with a visible `+1` increase.
-- Slaying it is the only way to earn the one-use Cursed Slash.
-- Failure ends the chain without granting the reward.
-- The reward cannot affect the encounter that created it.
-- The Cursed Slash deals exactly `+1` displayed and applied damage once.
-- The chain never loops, stacks, duplicates, or disappears ambiguously.
-- Empty and cascade encounters preserve the defined state.
-- A second Curse cannot become a dead block or create a concurrent chain.
-- Core outcomes do not depend on animation timing.
-- The implementation gives the player a visible reason to plan the current monster encounter and a
-  later encounter together.
+- Every resolved Curse adds one visible pending charge.
+- A newly resolved Curse waits until a later monster encounter.
+- Empty encounters preserve the full queue.
+- An applicable encounter consumes exactly one charge and infects only the front monster.
+- A Cursed Monster visibly and mechanically gains `+1 value` before resolution.
+- Slaying it grants exactly two treasure through core logic.
+- Failure and Guard absorption grant no bounty.
+- Additional queued charges remain available for later encounters.
+- Multiple Curse blocks never become dead blocks.
+- No Cursed Slash state or behavior remains.
+- Deterministic tests pass without depending on animation updates.

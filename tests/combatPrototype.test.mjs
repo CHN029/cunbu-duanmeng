@@ -1,10 +1,17 @@
 import assert from "node:assert/strict";
 
-import { createBoard } from "../src/core/board.js";
+import { createBoard, getLandingPiece, getSettledLandingPiece } from "../src/core/board.js";
 import { BLOCK_TYPES } from "../src/core/blockTypes.js";
-import { NORMAL_BLOCK_PERCENTAGES } from "../src/core/config.js";
-import { getSlashDamage } from "../src/core/combatRules.js";
+import {
+  CURSED_MONSTER_TREASURE_GAIN,
+  CURSED_MONSTER_VALUE_BONUS,
+  MERCHANT_PURCHASE_COST,
+  MONSTER_BLOCK_PERCENTAGES,
+  MONSTER_COUNT_PERCENTAGES,
+  NORMAL_BLOCK_PERCENTAGES,
+} from "../src/core/config.js";
 import { startEncounter, updateEncounter } from "../src/core/encounterOrchestrator.js";
+import { chooseMerchantOption } from "../src/core/game.js";
 import { updateUiEffects } from "../src/core/uiEffects.js";
 
 function block(type) {
@@ -23,12 +30,12 @@ function makeGame() {
     board: createBoard(),
     active: { normal: null, monsters: null },
     player: {
-      body: 3,
+      body: 6,
       maxBody: 6,
       swordSkill: 0,
       treasure: 0,
       guard: 0,
-      curseChain: { phase: "inactive" },
+      pendingCurses: 0,
       blessings: [],
       blessingIds: [],
       armorValueBonus: 0,
@@ -43,6 +50,8 @@ function makeGame() {
     merchant: null,
     effects: [],
     uiEffects: [],
+    gravityAnimations: [],
+    exitAnimations: [],
   };
 }
 
@@ -56,28 +65,18 @@ function setBottomRow(game, normalTypes, monsterTypes = []) {
   });
 }
 
-function resolveEncounter(game) {
+function resolveEncounter(game, { updateUi = true } = {}) {
   startEncounter(game);
-  advanceEncounter(game);
+  advanceEncounter(game, { updateUi });
 }
 
-function advanceEncounter(game) {
-  for (let step = 0; step < 80; step += 1) {
-    updateUiEffects(game, 100);
+function advanceEncounter(game, { updateUi = true } = {}) {
+  for (let step = 0; step < 160; step += 1) {
+    if (updateUi) updateUiEffects(game, 100);
     if (updateEncounter(game, 100)) return;
   }
 
   throw new Error("Encounter did not resolve in test loop.");
-}
-
-function resolveEncounterWithoutUiEffects(game) {
-  startEncounter(game);
-
-  for (let step = 0; step < 80; step += 1) {
-    if (updateEncounter(game, 100)) return;
-  }
-
-  throw new Error("Encounter did not resolve in rules-only test loop.");
 }
 
 function bottom(game, x) {
@@ -85,142 +84,173 @@ function bottom(game, x) {
 }
 
 assert.equal(NORMAL_BLOCK_PERCENTAGES.D, 0, "Sword block should not appear in normal generation.");
+assert.equal(Object.values(NORMAL_BLOCK_PERCENTAGES).reduce((sum, value) => sum + value, 0), 100, "Normal block percentages should add up to 100.");
+assert.equal(Object.values(MONSTER_BLOCK_PERCENTAGES).reduce((sum, value) => sum + value, 0), 100, "Monster block percentages should add up to 100.");
+assert.equal(Object.values(MONSTER_COUNT_PERCENTAGES).reduce((sum, value) => sum + value, 0), 100, "Monster-count percentages should add up to 100.");
+
+{
+  const board = createBoard();
+  const landing = getLandingPiece(board, { blocks: [{ x: 1, y: 0 }, { x: 2, y: 0 }] }, 0, 3);
+  assert.deepEqual(landing.blocks.map(({ y }) => y), [8, 8], "Landing ghost should rest on the board floor.");
+}
+
+{
+  const board = createBoard();
+  board[8][1] = block("B");
+  const landing = getSettledLandingPiece(board, { blocks: [{ x: 1, y: 0 }, { x: 2, y: 0 }] }, 0, 3);
+  assert.deepEqual(landing.blocks.map(({ y }) => y), [7, 8], "Landing ghost should preview column settling into lower gaps.");
+}
 
 {
   const game = makeGame();
-  setBottomRow(game, ["L", "T", "T", "T"], ["R"]);
+  game.player.treasure = 12;
+  game.merchant = {
+    options: [{ id: "renewal", label: "回春", category: "instant" }],
+    resumeWithNewRound: false,
+    preview: false,
+  };
+  chooseMerchantOption(game, 0);
+  const expectedTreasure = MERCHANT_PURCHASE_COST == null ? 0 : Math.max(0, 12 - MERCHANT_PURCHASE_COST);
+  assert.equal(game.player.treasure, expectedTreasure, "Merchant purchase spending should follow config.");
+}
+
+{
+  const game = makeGame();
+  setBottomRow(game, ["L", "B", "B", "B"], ["R"]);
   resolveEncounter(game);
   assert.equal(bottom(game, 4).slayed, true, "One ordinary Slash should slay a tier-1 monster.");
 }
 
 {
   const game = makeGame();
-  setBottomRow(game, ["O", "L", "L", "T"], ["G", "M"]);
+  setBottomRow(game, ["O", "L", "L", "B"], ["G", "M"]);
+  bottom(game, 1).instantSlash = true;
   resolveEncounter(game);
-  assert.equal(bottom(game, 4).slayed, true, "Momentum should convert one Slash into a front-monster kill.");
-  assert.equal(game.player.body, 2, "Remaining ordinary Slash damage should reduce the next monster's attack.");
+  assert.equal(bottom(game, 4).slayed, true, "Momentum should convert its paired Slash into a front-monster kill.");
+  assert.equal(game.player.body, 5, "Remaining ordinary Slash damage should reduce the next monster's attack.");
 }
 
 {
   const game = makeGame();
-  setBottomRow(game, ["E", "T", "T", "T"]);
+  setBottomRow(game, ["E", "B", "B", "B"]);
   resolveEncounter(game);
   assert.equal(game.player.guard, 1, "Armor should add persistent Guard when no monster is present.");
 }
 
 {
   const game = makeGame();
-  setBottomRow(game, ["E", "T", "T", "T"], ["R"]);
-  resolveEncounterWithoutUiEffects(game);
-  assert.equal(game.player.body, 3, "Armor should protect before UI animation effects advance.");
+  setBottomRow(game, ["E", "B", "B", "B"], ["R"]);
+  resolveEncounter(game, { updateUi: false });
+  assert.equal(game.player.body, 6, "Armor should protect before UI animation effects advance.");
   assert.equal(game.player.guard, 0, "Armor protection should be spent by the monster attack.");
 }
 
 {
   const game = makeGame();
-  setBottomRow(game, ["C", "T", "T", "T"]);
+  setBottomRow(game, ["C", "B", "B", "B"]);
   resolveEncounter(game);
-  assert.equal(game.player.curseChain.phase, "pendingMonster", "Curse should remain pending after an empty encounter.");
+  assert.equal(game.player.pendingCurses, 1, "Curse should remain pending after an empty encounter.");
 }
 
 {
   const game = makeGame();
-  setBottomRow(game, ["C", "T", "T", "T"], ["R"]);
+  game.player.pendingCurses = 2;
+  setBottomRow(game, ["B", "B", "B", "B"]);
+  resolveEncounter(game);
+  assert.equal(game.player.pendingCurses, 2, "Empty encounters should preserve every queued Curse.");
+}
+
+{
+  const game = makeGame();
+  setBottomRow(game, ["C", "B", "B", "B"], ["R"]);
   startEncounter(game);
-  assert.equal(bottom(game, 4).cursedMonster, undefined, "A Curse created in the current encounter should not curse that encounter's monster.");
+  assert.equal(bottom(game, 4).cursedMonster, undefined, "A Curse from the current row must not infect that row's monster.");
   advanceEncounter(game);
-  assert.equal(game.player.body, 2, "The current monster should attack with its ordinary value.");
-  assert.equal(game.player.curseChain.phase, "pendingMonster", "Current-encounter Curse should wait for the next monster encounter.");
+  assert.equal(game.player.body, 5, "The current monster should attack with its ordinary value.");
+  assert.equal(game.player.pendingCurses, 1, "Current-row Curse should queue for a later monster encounter.");
 }
 
 {
   const game = makeGame();
-  game.player.curseChain = { phase: "pendingMonster" };
-  setBottomRow(game, ["T", "T", "T", "T"], ["R"]);
-  resolveEncounter(game);
-  assert.equal(game.player.body, 1, "A surviving Cursed Monster should attack with its increased remaining value.");
-  assert.equal(game.player.curseChain.phase, "inactive", "A surviving Cursed Monster should end the chain.");
-}
-
-{
-  const game = makeGame();
-  game.player.curseChain = { phase: "pendingMonster" };
-  game.player.guard = 2;
-  setBottomRow(game, ["T", "T", "T", "T"], ["R"]);
-  resolveEncounter(game);
-  assert.equal(game.player.body, 3, "Guard should absorb a Cursed Monster attack without earning the reward.");
-  assert.equal(game.player.guard, 0, "Guard should be spent by the increased Cursed Monster attack.");
-  assert.equal(game.player.curseChain.phase, "inactive", "Guard absorption should still end a failed Curse chain.");
-}
-
-{
-  const game = makeGame();
-  game.player.curseChain = { phase: "pendingMonster" };
-  setBottomRow(game, ["T", "T", "T", "T"], ["R", "M"]);
+  game.player.pendingCurses = 1;
+  setBottomRow(game, ["B", "B", "B", "B"], ["R"]);
   startEncounter(game);
-  assert.equal(bottom(game, 4).cursedMonster, true, "Pending Curse should attach to the front monster.");
-  assert.equal(bottom(game, 4).value, 2, "A value-1 monster should display and resolve as value 2 when cursed.");
-  assert.equal(bottom(game, 5).cursedMonster, undefined, "Curse should not attach to the second monster first.");
+  assert.equal(game.player.pendingCurses, 0, "An applicable encounter should consume exactly one queued Curse.");
+  assert.equal(bottom(game, 4).cursedMonster, true, "Queued Curse should infect the front monster before resolution.");
+  assert.equal(bottom(game, 4).value, 1 + CURSED_MONSTER_VALUE_BONUS, "Cursed Monster should display its increased value.");
+  advanceEncounter(game);
+  assert.equal(game.player.body, 4, "A surviving Cursed Monster should attack with its increased value.");
+  assert.equal(game.player.treasure, 0, "Surviving a Cursed Monster should grant no bounty.");
 }
 
 {
   const game = makeGame();
-  game.player.curseChain = { phase: "pendingMonster" };
-  setBottomRow(game, ["L", "L", "T", "T"], ["R"]);
+  game.player.pendingCurses = 1;
+  game.player.guard = 2;
+  setBottomRow(game, ["B", "B", "B", "B"], ["R"]);
   resolveEncounter(game);
-  assert.equal(bottom(game, 4).slayed, true, "Ordinary Slash damage should slay a Cursed tier-1 monster.");
-  assert.equal(game.player.curseChain.phase, "pendingSlash", "Slaying a Cursed Monster should create one future Cursed Slash.");
+  assert.equal(game.player.body, 6, "Guard should absorb a Cursed Monster attack without earning the bounty.");
+  assert.equal(game.player.guard, 0, "Guard should be spent by the increased Cursed Monster attack.");
+  assert.equal(game.player.treasure, 0, "Guard absorption must not count as slaying the Cursed Monster.");
 }
 
 {
   const game = makeGame();
-  game.player.curseChain = { phase: "pendingMonster" };
-  setBottomRow(game, ["O", "L", "T", "T"], ["G"]);
+  game.player.pendingCurses = 2;
+  setBottomRow(game, ["B", "B", "B", "B"], ["R", "M"]);
+  startEncounter(game);
+  assert.equal(game.player.pendingCurses, 1, "A monster encounter should consume only one queued Curse.");
+  assert.equal(bottom(game, 4).cursedMonster, true, "The first Curse should infect the front monster.");
+  assert.equal(bottom(game, 5).cursedMonster, undefined, "Remaining Curse should wait instead of infecting a second monster.");
+}
+
+{
+  const game = makeGame();
+  game.player.pendingCurses = 1;
+  setBottomRow(game, ["L", "L", "B", "B"], ["R"]);
+  resolveEncounter(game);
+  assert.equal(bottom(game, 4).slayed, true, "Ordinary Slash damage should slay a cursed tier-1 monster.");
+  assert.equal(game.player.treasure, CURSED_MONSTER_TREASURE_GAIN, "Slaying a Cursed Monster should grant exactly two treasure.");
+  assert.equal(game.player.pendingCurses, 0, "The consumed Curse should not return after the bounty resolves.");
+}
+
+{
+  const game = makeGame();
+  game.player.pendingCurses = 1;
+  setBottomRow(game, ["O", "L", "B", "B"], ["G"]);
+  bottom(game, 1).instantSlash = true;
   resolveEncounter(game);
   assert.equal(bottom(game, 4).slayed, true, "Momentum should count as a legitimate Cursed Monster slay.");
-  assert.equal(game.player.curseChain.phase, "pendingSlash", "Momentum slay should create the same future Cursed Slash reward.");
+  assert.equal(game.player.treasure, CURSED_MONSTER_TREASURE_GAIN, "Momentum slay should grant the same bounty.");
 }
 
 {
   const game = makeGame();
-  game.player.curseChain = { phase: "pendingMonster" };
-  game.board[game.height - 2][0] = block("L");
-  setBottomRow(game, ["L", "L", "T", "T"], ["R"]);
-  const currentSlash = bottom(game, 0);
+  game.player.pendingCurses = 1;
+  setBottomRow(game, ["L", "L", "B", "B"], ["R", "M"]);
   resolveEncounter(game);
-  assert.equal(currentSlash.cursedSlash, undefined, "The reward should not empower a Slash in the same encounter that earned it.");
-  assert.equal(game.board[game.height - 2][0].cursedSlash, true, "The next future Slash on the board should be marked.");
-  assert.equal(game.player.curseChain.phase, "cursedSlash", "A marked future Slash should hold the cursedSlash phase.");
+  assert.equal(bottom(game, 4).slayed, true, "The cursed front monster should be slain.");
+  assert.equal(game.player.body, 4, "A different surviving monster should still attack normally.");
+  assert.equal(game.player.treasure, CURSED_MONSTER_TREASURE_GAIN, "Slaying the cursed target should earn its bounty even if another monster survives.");
 }
 
 {
   const game = makeGame();
-  setBottomRow(game, ["L", "T", "T", "T"], ["M"]);
-  const slash = bottom(game, 0);
-  slash.cursedSlash = true;
-  game.player.curseChain = { phase: "cursedSlash" };
-  assert.equal(getSlashDamage(game, null, slash), 2, "A Cursed Slash should display +1 damage through shared rules.");
+  setBottomRow(game, ["C", "C", "B", "B"]);
   resolveEncounter(game);
-  assert.equal(bottom(game, 4).slayed, true, "A Cursed Slash should apply its +1 damage once.");
-  assert.equal(game.player.curseChain.phase, "inactive", "A resolving Cursed Slash should end the chain.");
+  assert.equal(game.player.pendingCurses, 2, "Two Curse blocks in one row should queue two future infections.");
 }
 
 {
   const game = makeGame();
-  setBottomRow(game, ["L", "T", "T", "T"]);
-  const slash = bottom(game, 0);
-  slash.cursedSlash = true;
-  game.player.curseChain = { phase: "cursedSlash" };
-  resolveEncounter(game);
-  assert.equal(game.player.curseChain.phase, "inactive", "A Cursed Slash should be spent even without monsters.");
-}
-
-{
-  const game = makeGame();
-  game.player.curseChain = { phase: "pendingMonster" };
-  setBottomRow(game, ["C", "T", "T", "T"]);
+  game.player.pendingCurses = 1;
+  setBottomRow(game, ["C", "L", "L", "B"], ["R"]);
   startEncounter(game);
-  assert.equal(bottom(game, 0).type, "L", "A second Curse should be deterministically replaced while a chain is active.");
+  assert.equal(game.player.pendingCurses, 0, "The previously queued Curse should infect the current front monster.");
+  advanceEncounter(game);
+  assert.equal(bottom(game, 4).slayed, true, "The infected monster should be slain by the current Slashes.");
+  assert.equal(game.player.treasure, CURSED_MONSTER_TREASURE_GAIN, "The infected monster should grant its bounty.");
+  assert.equal(game.player.pendingCurses, 1, "The newly resolved Curse should wait for a later monster encounter.");
 }
 
 console.log("combat prototype scenarios passed");

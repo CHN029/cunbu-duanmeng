@@ -1,4 +1,4 @@
-import { BOARD_HEIGHT, BOARD_WIDTH, NORMAL_COLUMNS } from "./config.js?v=20260822-15";
+import { BOARD_HEIGHT, BOARD_WIDTH, NORMAL_COLUMNS } from "./config.js?v=20260824-3";
 
 export function createBoard() {
   return Array.from({ length: BOARD_HEIGHT }, () => Array(BOARD_WIDTH).fill(null));
@@ -53,6 +53,39 @@ export function shiftPiece(piece, dx, dy) {
       x: block.x + dx,
       y: block.y + dy,
     })),
+  };
+}
+
+export function getLandingPiece(board, piece, minX, maxX) {
+  let landing = piece;
+  let next = shiftPiece(landing, 0, 1);
+
+  while (!collides(board, next, minX, maxX)) {
+    landing = next;
+    next = shiftPiece(landing, 0, 1);
+  }
+
+  return landing;
+}
+
+export function getSettledLandingPiece(board, piece, minX, maxX) {
+  const landing = getLandingPiece(board, piece, minX, maxX);
+  const previewBoard = board.map((row) => [...row]);
+  const previewBlocks = landing.blocks.map((block) => ({ ...block }));
+
+  previewBlocks.forEach((block) => {
+    if (block.y >= 0) previewBoard[block.y][block.x] = block;
+  });
+  settleBoardColumns(previewBoard, minX, maxX);
+
+  return {
+    ...landing,
+    blocks: previewBlocks.map((block) => {
+      for (let y = 0; y < previewBoard.length; y += 1) {
+        if (previewBoard[y][block.x] === block) return { ...block, y };
+      }
+      return block;
+    }),
   };
 }
 

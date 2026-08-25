@@ -1,6 +1,7 @@
-import { drawMerchant } from "./merchantRenderer.js?v=20260822-2";
-import { getEncounterEvents, getSlashDamage as getResolvedSlashDamage, isInstantSlashEvent } from "../core/combatRules.js?v=20260822-7";
-import { COLORS } from "../theme/colors.js?v=20260821-19";
+import { drawMerchant } from "./merchantRenderer.js?v=20260825-4";
+import { getSettledLandingPiece } from "../core/board.js?v=20260825-3";
+import { getEncounterEvents, getSlashDamage as getResolvedSlashDamage, isInstantSlashEvent } from "../core/combatRules.js?v=20260824-1";
+import { COLORS } from "../theme/colors.js?v=20260825-23";
 
 export function createCanvasRenderer(canvas) {
   const context = canvas.getContext("2d");
@@ -38,6 +39,7 @@ export function createCanvasRenderer(canvas) {
       drawEncounterGate(context, game, cell, laneGap);
       drawBoard(context, game.board, cell, game.normalColumns, laneGap, game);
       drawExitAnimations(context, game, cell, game.normalColumns, laneGap);
+      drawLandingGhost(context, game, cell, laneGap, normalDropProgress);
       drawPiece(context, game.active.normal, cell, game.normalColumns, laneGap, game, normalDropProgress);
       drawPiece(context, game.active.monsters, cell, game.normalColumns, laneGap, game, monsterDropProgress);
       drawLaneDivider(context, canvas, game.normalColumns, cell, laneGap);
@@ -64,7 +66,7 @@ function resizeCanvasToDisplaySize(canvas) {
 }
 
 function drawBackground(context, canvas) {
-  context.fillStyle = COLORS.white;
+  context.fillStyle = COLORS.paper;
   context.fillRect(0, 0, canvas.width, canvas.height);
 }
 
@@ -127,6 +129,39 @@ function drawPiece(context, piece, cell, normalColumns, laneGap, game, yOffset =
     const blockOffset = getBlockYOffset(game, block, yOffset);
     if (block.y + blockOffset >= 0) drawCell(context, block.x, block.y + blockOffset, cell, block, normalColumns, laneGap, game);
   });
+}
+
+function drawLandingGhost(context, game, cell, laneGap, dropProgress) {
+  const piece = game.active.normal;
+  if (!piece || !piece.blocks.some((block) => block.y >= -1) || game.gameOver || game.runComplete || game.encounter || game.merchant) return;
+
+  const landing = getSettledLandingPiece(game.board, piece, 0, game.normalColumns - 1);
+  if (landing.blocks.every((block, index) => block.y === piece.blocks[index].y)) return;
+  const distance = Math.min(...landing.blocks.map((block, index) => block.y - piece.blocks[index].y - dropProgress));
+  const visibility = Math.min(1, Math.max(0, (distance - 0.25) / 2.5));
+
+  landing.blocks.forEach((block) => {
+    if (block.y >= 0) drawGhostCell(context, block.x, block.y, cell, block, visibility);
+  });
+}
+
+function drawGhostCell(context, x, y, cell, block, visibility) {
+  const left = x * cell;
+  const top = y * cell;
+
+  context.save();
+  context.globalAlpha = visibility;
+  context.fillStyle = COLORS.ghost;
+  context.textAlign = "center";
+  context.textBaseline = "middle";
+  drawCornerMarks(context, left, top, cell, null, COLORS.ghost);
+  context.font = `300 ${Math.floor(cell * 0.7)}px "Huiwen-Fangsong", "STFangsong", "Songti TC", serif`;
+  if (block.label.length > 1) {
+    drawCompressedVerticalGlyph(context, block.label, left + cell / 2, top + cell * 0.5, cell * 0.68, 0.5, 1);
+  } else {
+    context.fillText(block.label, left + cell / 2, top + cell * getGlyphCenterY(block));
+  }
+  context.restore();
 }
 
 function getBlockYOffset(game, block, yOffset) {
@@ -327,7 +362,7 @@ function drawSlainMonsterRing(context, left, top, size, alpha = 1) {
   context.save();
   context.globalAlpha *= 0.92 * alpha;
 
-  context.strokeStyle = COLORS.white;
+  context.strokeStyle = COLORS.paper;
   context.lineWidth = Math.max(1.8, size * 0.038);
   context.beginPath();
   context.arc(centerX, centerY, radius + size * 0.032, 0, Math.PI * 2);
@@ -339,7 +374,7 @@ function drawSlainMonsterRing(context, left, top, size, alpha = 1) {
   context.arc(centerX, centerY, radius, 0, Math.PI * 2);
   context.stroke();
 
-  context.strokeStyle = COLORS.white;
+  context.strokeStyle = COLORS.paper;
   context.lineWidth = Math.max(1.3, size * 0.026);
   context.beginPath();
   context.arc(centerX, centerY, radius - size * 0.032, 0, Math.PI * 2);

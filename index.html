@@ -3,19 +3,34 @@
   <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-    <title>寸步短夢</title>
-    <link rel="stylesheet" href="./styles.css?v=20260822-61">
+    <title>随手無常記</title>
+    <link rel="stylesheet" href="./styles.css?v=20260825-90">
   </head>
-  <body>
+  <body class="is-idle">
+    <section id="cover" class="cover-screen" role="button" tabindex="0" aria-label="開始随手無常記">
+      <div class="cover-title">
+        <p class="cover-prefix"><span>随</span><span>手</span></p>
+        <h1 class="cover-main-title" aria-label="無常記">
+          <span>無</span>
+          <span>常</span>
+          <span>記</span>
+        </h1>
+      </div>
+    </section>
+
     <div id="ui-effects" class="ui-effects" aria-hidden="true"></div>
     <main class="game-shell">
-      <section class="play-area" aria-label="寸步短夢棋盤">
+      <section class="play-area" aria-label="随手無常記棋盤">
         <div id="upcoming" class="upcoming-row" aria-label="將至"></div>
         <canvas id="game" width="300" height="423"></canvas>
       </section>
 
       <aside class="side-panel" aria-label="狀態">
         <div class="status-block">
+          <div class="round-actions">
+            <p id="round" class="round-value">第一回</p>
+            <button id="new-run" type="button">週而復始</button>
+          </div>
           <div class="stats-row">
             <div class="stat-item body-meter-section">
               <p class="label">體</p>
@@ -32,19 +47,12 @@
             </div>
           </div>
         </div>
-        <div class="mobile-pause-actions">
-          <button id="pause-run" type="button">止戈</button>
-        </div>
-        <div class="round-actions">
-          <p id="round" class="round-value">第一回</p>
-          <button id="new-run" type="button">週而復始</button>
-        </div>
         <div class="hidden-dev-controls">
           <button id="show-shop" type="button">暫看行商</button>
         </div>
       </aside>
     </main>
 
-    <script type="module" src="./src/main.js?v=20260822-147"></script>
+    <script type="module" src="./src/main.js?v=20260825-17"></script>
   </body>
 </html>

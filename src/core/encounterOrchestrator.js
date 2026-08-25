@@ -1,9 +1,10 @@
-import { settleBoard } from "./board.js?v=20260822-2";
+import { settleBoard } from "./board.js?v=20260824-1";
 import {
   BOARD_HEIGHT,
   BOARD_WIDTH,
   CURSED_MONSTER_TREASURE_GAIN,
   CURSED_MONSTER_VALUE_BONUS,
+  CURSE_BLOCK_PENDING_GAIN,
   ENCOUNTER_ATTACK_EFFECT_WAIT_MS,
   ENCOUNTER_DAMAGE_EFFECT_WAIT_MS,
   ENCOUNTER_INTRO_MS,
@@ -19,6 +20,7 @@ import {
   LOOT_TREASURE_CHANCE,
   LOOT_TREASURE_GAIN,
   MAX_GUARD,
+  MAX_LOOT_CHANCE,
   MAX_SWORD_SKILL,
   MONSTER_HIT_SHAKE_MS,
   MONSTER_START_X,
@@ -30,11 +32,11 @@ import {
   TREASURE_BLOCK_GAIN,
   UI_EFFECT_MS,
   UI_EFFECT_STAGGER_MS,
-} from "./config.js?v=20260822-24";
-import { getSlashDamage } from "./combatRules.js?v=20260822-7";
-import { addEffect, updateEffects } from "./effects.js?v=20260822-1";
-import { addUiEffect } from "./uiEffects.js?v=20260822-4";
-import { COLORS } from "../theme/colors.js?v=20260821-19";
+} from "./config.js?v=20260824-3";
+import { getSlashDamage } from "./combatRules.js?v=20260824-1";
+import { addEffect, updateEffects } from "./effects.js?v=20260824-1";
+import { addUiEffect } from "./uiEffects.js?v=20260824-1";
+import { COLORS } from "../theme/colors.js?v=20260825-23";
 
 export function startEncounter(game) {
   const normalEvents = game.board[BOARD_HEIGHT - 1]
@@ -202,18 +204,17 @@ function applyNormalBlock(game, event, delay = 0) {
   }
 
   if (block.type === "C") {
-    if (startPendingCurse(game)) {
-      addUiEffect(game, {
-        type: "travel",
-        label: block.label,
-        color: COLORS.corners.curse,
-        target: "curse",
-        delay,
-        x: event.x,
-        y: event.y,
-      });
-      wait = ENCOUNTER_UI_EFFECT_WAIT_MS + delay;
-    }
+    enqueuePendingCurse(game);
+    addUiEffect(game, {
+      type: "travel",
+      label: block.label,
+      color: COLORS.corners.curse,
+      target: "curse",
+      delay,
+      x: event.x,
+      y: event.y,
+    });
+    wait = ENCOUNTER_UI_EFFECT_WAIT_MS + delay;
   }
 
   if (block.type === "T") {
@@ -267,7 +268,7 @@ function damageFrontMonsters(game, slashEvents, sources) {
   const targets = [];
 
   while (instantSlays > 0 || normalDamage > 0) {
-    const target = findFrontEncounterMonster(game);
+    const target = instantSlays > 0 ? findHighestValueEncounterMonster(game) : findFrontEncounterMonster(game);
     if (!target) return addSlashBeamEffect(game, sources, targets, wait);
 
     const previousValue = target.block.value;
@@ -342,7 +343,7 @@ function tryLootSlainMonster(game, target) {
 
 function getLootChance(game) {
   const blessingCount = game.player.blessingIds.filter((id) => id === "lootCraft").length;
-  return Math.min(1, LOOT_CHANCE + blessingCount * LOOT_CHANCE_BLESSING_BONUS);
+  return Math.min(MAX_LOOT_CHANCE, LOOT_CHANCE + blessingCount * LOOT_CHANCE_BLESSING_BONUS);
 }
 
 function findFrontEncounterMonster(game) {
@@ -359,6 +360,15 @@ function findFrontEncounterMonster(game) {
   }
 
   return null;
+}
+
+function findHighestValueEncounterMonster(game) {
+  return getMonsterEncounterEvents(game).reduce((best, event) => {
+    const block = game.board[event.y]?.[event.x];
+    if (block !== event.block || !isMonsterBlock(block) || block.slayed) return best;
+    if (!best || block.value > best.block.value) return { block, x: event.x, y: event.y };
+    return best;
+  }, null);
 }
 
 function removeSlainMonsters(board) {
@@ -384,7 +394,6 @@ function takeDamage(game, event) {
 
   game.player.guard -= shieldedDamage;
   game.player.body -= finalDamage;
-  if (event.block?.cursedMonster) endCurseChain(game);
   if (finalDamage > 0) addUiEffect(game, { type: "shake", target: "body" });
 
   if (game.player.body <= 0) {
@@ -394,30 +403,23 @@ function takeDamage(game, event) {
   return shieldedDamage > 0 || finalDamage > 0 ? ENCOUNTER_DAMAGE_EFFECT_WAIT_MS : ENCOUNTER_MINOR_EFFECT_WAIT_MS;
 }
 
-function startPendingCurse(game) {
-  if (isCurseChainActive(game)) return false;
-
-  game.player.curseChain = {
-    phase: "pendingMonster",
-  };
-  return true;
+function enqueuePendingCurse(game) {
+  game.player.pendingCurses = (game.player.pendingCurses ?? 0) + CURSE_BLOCK_PENDING_GAIN;
 }
 
 function attachPendingCurseToFrontMonster(game) {
-  if (game.player.curseChain?.phase !== "pendingMonster") return false;
+  if ((game.player.pendingCurses ?? 0) <= 0) return false;
 
   const target = findFrontEncounterMonster(game);
   if (!target) return false;
 
+  game.player.pendingCurses -= 1;
   target.block.cursedMonster = true;
   target.block.value += CURSED_MONSTER_VALUE_BONUS;
   target.block.curseValueBonus = CURSED_MONSTER_VALUE_BONUS;
   target.block.curseReveal = {
     elapsed: 0,
     duration: UI_EFFECT_MS,
-  };
-  game.player.curseChain = {
-    phase: "cursedMonster",
   };
   addUiEffect(game, {
     type: "travel",
@@ -450,16 +452,11 @@ function resolveSlainCursedMonsterReward(game, delay = 0) {
       y: target.y,
     });
   }
-  endCurseChain(game);
   return true;
 }
 
 function getOrdinarySlashDamage(game, slashEvents) {
   return slashEvents.reduce((sum, event) => sum + getSlashDamage(game, game.encounter, event.block), 0);
-}
-
-function isCurseChainActive(game) {
-  return game.player.curseChain?.phase && game.player.curseChain.phase !== "inactive";
 }
 
 function findSlainCursedEncounterMonster(game) {
@@ -480,12 +477,6 @@ function getMonsterEncounterEvents(game) {
     ...(game.encounter?.current?.events ?? []),
     ...(game.encounter?.queue ?? []).flatMap((group) => group.events),
   ].filter((event) => event?.type === "monster");
-}
-
-function endCurseChain(game) {
-  game.player.curseChain = {
-    phase: "inactive",
-  };
 }
 
 function healPlayer(player, amount) {

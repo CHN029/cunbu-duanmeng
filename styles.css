@@ -4,17 +4,26 @@
   font-display: block;
 }
 
+@font-face {
+  font-family: "YDW aosagi";
+  src: url("./assets/fonts/YDWaosagi.otf") format("opentype");
+  font-style: normal;
+  font-weight: 400;
+  font-display: block;
+}
+
 :root {
   color-scheme: light;
-  --bg: #ffffff;
+  --paper: #f5f2e9;
+  --bg: var(--paper);
   --ink: #222222;
   --muted: #666666;
-  --panel: #ffffff;
+  --panel: var(--paper);
   --line: #bdbdbd;
   --accent: #333333;
   --red-heart: #a30636;
   --shield-blue: #5f7fa8;
-  --curse-blue: #0057ba;
+  --curse-blue: #31536d;
 }
 
 * {
@@ -33,6 +42,108 @@ body {
   font-family: "Huiwen-Fangsong", "STFangsong", "Songti TC", serif;
   touch-action: none;
   overscroll-behavior: none;
+}
+
+.cover-screen {
+  --frame-width: min(62vw, 240px);
+  --frame-height: min(70svh, 590px);
+  position: relative;
+  width: min(100%, 390px);
+  height: min(calc(100svh - 24px), 844px);
+  display: none;
+  place-items: center;
+  background: var(--paper);
+  color: #1d1c18;
+  cursor: pointer;
+  font-family: "YDW aosagi", serif;
+  opacity: 1;
+  transition: opacity 900ms ease-in-out;
+}
+
+.cover-screen::before,
+.cover-screen::after {
+  content: "";
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  transform: translate(-50%, -50%);
+  pointer-events: none;
+}
+
+.cover-screen::before {
+  width: var(--frame-width);
+  height: var(--frame-height);
+  border: 2px solid rgba(29, 28, 24, 0.92);
+}
+
+.cover-screen::after {
+  width: calc(var(--frame-width) - 10px);
+  height: calc(var(--frame-height) - 10px);
+  border: 1px solid rgba(29, 28, 24, 0.42);
+}
+
+.cover-screen:focus-visible {
+  outline: 3px solid #777777;
+  outline-offset: -6px;
+}
+
+.cover-title {
+  width: clamp(112px, 35.9vw, 140px);
+  transform: translateY(-1.5%);
+  color: #302e29;
+  text-align: center;
+}
+
+.cover-prefix {
+  display: flex;
+  justify-content: center;
+  gap: 0;
+  margin: 0 0 10px;
+  font-family: "YDW aosagi", serif;
+  font-size: clamp(40px, 12.82vw, 50px);
+  font-weight: 400;
+  font-synthesis: none;
+  line-height: 0.82;
+  transform: scale(1.18, 0.9);
+}
+
+.cover-prefix span {
+  margin-inline: -0.06em;
+}
+
+.cover-prefix span:first-child {
+  order: 2;
+}
+
+.cover-prefix span:last-child {
+  order: 1;
+}
+
+.cover-main-title {
+  display: grid;
+  gap: 0;
+  margin: 0;
+  font-size: clamp(88px, 28.2vw, 110px);
+  font-weight: 400;
+  line-height: 0.72;
+}
+
+.cover-main-title span {
+  display: block;
+  transform: scale(1.24, 0.82);
+}
+
+.is-idle .cover-screen {
+  display: grid;
+}
+
+.is-cover-exiting .cover-screen {
+  opacity: 0;
+  pointer-events: none;
+}
+
+.is-idle .game-shell {
+  display: none;
 }
 
 .ui-effects {
@@ -58,10 +169,12 @@ body {
 }
 
 .game-shell {
+  --play-width: min(330px, calc(100vw - 100px));
+  --play-width: min(330px, calc(100vw - 100px), calc(70.9svh - 70px));
   position: relative;
-  width: min(94vw, 620px);
+  width: min(96vw, calc(var(--play-width) + 80px));
   display: grid;
-  grid-template-columns: minmax(260px, 300px) max-content;
+  grid-template-columns: minmax(0, var(--play-width)) max-content;
   gap: 7px;
   align-items: start;
   justify-content: center;
@@ -69,7 +182,7 @@ body {
 
 .play-area {
   padding: 10px;
-  background: #ffffff;
+  background: var(--paper);
 }
 
 .upcoming-row {
@@ -138,15 +251,14 @@ canvas {
   width: 100%;
   aspect-ratio: 300 / 423;
   display: block;
-  background: #ffffff;
+  background: var(--paper);
 }
 
 .side-panel {
   width: max-content;
   justify-self: start;
   display: grid;
-  grid-template-columns: max-content max-content;
-  gap: 10px;
+  grid-template-columns: max-content;
   align-items: start;
   padding: 10px 0;
   background: var(--panel);
@@ -161,7 +273,7 @@ canvas {
 .label {
   margin: 0;
   color: var(--muted);
-  font-size: 1.26rem;
+  font-size: 1.34rem;
   font-weight: 400;
   text-align: center;
   writing-mode: vertical-rl;
@@ -170,7 +282,7 @@ canvas {
 
 .value {
   margin: 0;
-  font-size: 1.58rem;
+  font-size: 1.34rem;
   font-weight: 400;
   line-height: 1;
   text-align: center;
@@ -191,7 +303,7 @@ canvas {
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: 13px;
+  gap: 17px;
 }
 
 .stat-item {
@@ -238,10 +350,10 @@ canvas {
 }
 
 .guard-dot {
-  width: 8px;
-  height: 8px;
-  border: 1px solid var(--shield-blue);
-  background: var(--shield-blue);
+  width: 9px;
+  height: 9px;
+  border: 2px solid var(--shield-blue);
+  background: transparent;
   border-radius: 50%;
 }
 
@@ -290,16 +402,13 @@ canvas {
   flex-direction: column;
   align-items: center;
   gap: 6px;
-}
-
-.mobile-pause-actions {
-  display: none;
+  margin: 0 auto 16px;
 }
 
 .round-value {
   margin: 0;
   color: var(--ink);
-  font-size: 1.04rem;
+  font-size: 1.34rem;
   font-weight: 800;
   line-height: 1.2;
   text-align: center;
@@ -404,8 +513,6 @@ button:focus-visible {
   }
 
   .game-shell {
-    width: min(96vw, 560px);
-    grid-template-columns: minmax(240px, 300px) max-content;
     gap: 6px;
     align-items: stretch;
     padding: 8px 0;
@@ -417,8 +524,7 @@ button:focus-visible {
 
   .side-panel {
     display: grid;
-    grid-template-columns: max-content max-content;
-    gap: 8px;
+    grid-template-columns: max-content;
     align-self: stretch;
     padding: 8px 0;
   }
@@ -431,20 +537,12 @@ button:focus-visible {
   .stats-row {
     flex-direction: column;
     align-items: center;
-    gap: 10px;
+    gap: 15px;
   }
 
   .stat-item {
     flex-direction: column;
     gap: 5px;
-  }
-
-  .label {
-    font-size: 1.34rem;
-  }
-
-  .value {
-    font-size: 1.66rem;
   }
 
   .stat-value-row {
@@ -460,10 +558,14 @@ button:focus-visible {
     gap: 4px;
   }
 
-  .body-dot,
-  .guard-dot {
+  .body-dot {
     width: 9px;
     height: 9px;
+  }
+
+  .guard-dot {
+    width: 10px;
+    height: 10px;
   }
 
   .blessing-tags {
@@ -479,22 +581,10 @@ button:focus-visible {
   }
 
   .round-actions {
-    grid-column: 2;
-    grid-row: 1 / span 2;
     width: max-content;
     flex-direction: column;
     gap: 7px;
-  }
-
-  .mobile-pause-actions {
-    position: absolute;
-    right: 10px;
-    bottom: 10px;
-    display: flex;
-  }
-
-  .round-value {
-    font-size: 1.06rem;
+    margin-bottom: 18px;
   }
 
   button {
@@ -504,12 +594,6 @@ button:focus-visible {
     letter-spacing: 0.1em;
   }
 
-  #pause-run {
-    min-width: 36px;
-    font-size: 1.36rem;
-    letter-spacing: 0.18em;
-    padding: 3px;
-  }
 }
 
 @media (max-width: 560px) {
@@ -523,8 +607,6 @@ button:focus-visible {
   }
 
   .game-shell {
-    width: min(100%, 372px);
-    grid-template-columns: minmax(0, 268px) max-content;
     gap: 5px;
   }
 }

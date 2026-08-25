@@ -1,3 +1,5 @@
+// --- Board and pacing ---
+
 // Total board columns across normal and monster lanes.
 export const BOARD_WIDTH = 6;
 
@@ -12,6 +14,8 @@ export const MONSTER_COLUMNS = 2;
 
 // First monster column index, derived from the normal lane width.
 export const MONSTER_START_X = NORMAL_COLUMNS;
+
+// --- Presentation timing ---
 
 // Milliseconds between automatic normal-piece drops.
 export const DROP_MS = 800;
@@ -61,9 +65,6 @@ export const INSTANT_SLASH_REVEAL_MS = 360;
 // Milliseconds used to reveal a Cursed Monster as 鬼 after the curse arrives.
 export const CURSED_MONSTER_REVEAL_MS = 360;
 
-// Whether slain monsters can trigger 奪 loot rewards after slash damage.
-export const SLASH_LOOT_ENABLED = false;
-
 // Milliseconds to wait before showing 奪 after a monster slay effect starts.
 export const LOOT_EFFECT_DELAY_MS = 260;
 
@@ -91,35 +92,74 @@ export const ENCOUNTER_UI_EFFECT_WAIT_MS = UI_EFFECT_MS + 80;
 // Milliseconds to hold after a monster attack resolves.
 export const ENCOUNTER_DAMAGE_EFFECT_WAIT_MS = UI_SHAKE_MS + 80;
 
+// --- Run generation and occurrence rates ---
+
 // Number of pregenerated rounds in a full run.
 export const RUN_LENGTH = 80;
 
 // Number of normal blocks generated each round.
 export const NORMAL_BLOCKS_PER_ROUND = 2;
 
-// Probability that a round has no monster blocks.
-export const NO_MONSTER_ROUND_CHANCE = 0.45;
+// Number of future blocks shown to the player.
+export const UPCOMING_BLOCK_PREVIEW_COUNT = 6;
 
-// Conditional probability for one monster after the no-monster roll fails.
-export const ONE_MONSTER_AFTER_SPAWN_CHANCE = 0.75;
+// Percentage chance that a round contains 0, 1, or 2 monsters; values should add up to 100.
+export const MONSTER_COUNT_PERCENTAGES = {
+  0: 30,
+  1: 50,
+  2: 20,
+};
 
 // Percentage chance for each normal block type; values should add up to 100.
 export const NORMAL_BLOCK_PERCENTAGES = {
-  B: 15,
+  B: 12,
   D: 0,
-  L: 46,
-  C: 5,
-  T: 10,
-  O: 10,
+  L: 44,
+  C: 9,
+  T: 13,
+  O: 8,
   E: 14,
 };
 
 // Percentage chance for each monster block type; values should add up to 100.
 export const MONSTER_BLOCK_PERCENTAGES = {
-  R: 55,
-  M: 33,
-  G: 12,
+  R: 45,
+  M: 38,
+  G: 17,
 };
+
+// Encounter counts that define the four difficulty phases.
+export const ENCOUNTER_PHASES = [
+  { phase: 1, minEncounter: 0, maxEncounter: 6 },
+  { phase: 2, minEncounter: 7, maxEncounter: 14 },
+  { phase: 3, minEncounter: 15, maxEncounter: 23 },
+  { phase: 4, minEncounter: 24, maxEncounter: Infinity },
+];
+
+// Base monster-count table before phase pressure is applied.
+export const MONSTER_COUNT_CURVE_BASE = {
+  0: 40,
+  1: 50,
+  2: 10,
+};
+
+// Per-phase shift from empty monster rounds into double-monster rounds.
+export const MONSTER_COUNT_DOUBLE_SHIFT_PER_PHASE = 10;
+
+// Base monster-tier table before phase pressure is applied.
+export const MONSTER_BLOCK_CURVE_BASE = {
+  R: 60,
+  M: 32,
+  G: 8,
+};
+
+// Per-phase shift from weak monsters into stronger monsters.
+export const MONSTER_BLOCK_STRONG_SHIFT_PER_PHASE = 8;
+
+// Monster value bonus formula: max(0, phase - this value).
+export const MONSTER_VALUE_BONUS_PHASE_OFFSET = 2;
+
+// --- Starting player stats ---
 
 // Starting player health.
 export const INITIAL_BODY = 3;
@@ -133,8 +173,22 @@ export const INITIAL_SWORD_SKILL = 0;
 // Starting shop currency.
 export const INITIAL_TREASURE = 0;
 
+// Pending Curse charges at the start of a run.
+export const INITIAL_PENDING_CURSES = 0;
+
+// Persistent bonus added to each Armor block at the start of a run.
+export const INITIAL_ARMOR_VALUE_BONUS = 0;
+
+// Persistent Guard at the start of a run.
+export const INITIAL_GUARD = 0;
+
+// --- Block and combat values ---
+
 // Healing gained when 藥 resolves.
 export const HEAL_BLOCK_BODY_GAIN = 1;
+
+// Pending Curse charges gained when 呪 resolves.
+export const CURSE_BLOCK_PENDING_GAIN = 1;
 
 // Deprecated: Sword skill gained when 劍 resolves if the retained block is manually spawned.
 export const SWORD_BLOCK_SKILL_GAIN = 1;
@@ -151,9 +205,6 @@ export const TREASURE_BLOCK_GAIN = 1;
 // Intrinsic damage dealt by each ordinary 斬 before local or blessing bonuses.
 export const SLASH_INTRINSIC_DAMAGE = 1;
 
-// Persistent Guard at the start of a run.
-export const INITIAL_GUARD = 0;
-
 // Maximum persistent Guard that can be banked.
 export const MAX_GUARD = 6;
 
@@ -161,19 +212,27 @@ export const MAX_GUARD = 6;
 export const ARMOR_BLOCK_VALUE = 1;
 
 // Monster health and damage value for 獸.
-export const BANDIT_VALUE = 1;
+export const BEAST_VALUE = 1;
 
 // Monster health and damage value for 賊.
-export const GHOST_VALUE = 2;
+export const BANDIT_VALUE = 2;
 
 // Monster health and damage value for 兇.
-export const GENERAL_VALUE = 3;
+export const BRUTE_VALUE = 3;
+
+// --- Blessing and loot values ---
+
+// Whether slain monsters can trigger 奪 loot rewards after slash damage.
+export const SLASH_LOOT_ENABLED = false;
 
 // Base chance that 奪 triggers when a monster is slain.
 export const LOOT_CHANCE = 0.1;
 
 // Additional 奪 chance gained from each 斬奪 blessing.
 export const LOOT_CHANCE_BLESSING_BONUS = 0.1;
+
+// Maximum total 奪 trigger chance after blessings.
+export const MAX_LOOT_CHANCE = 1;
 
 // Chance that triggered 奪 grants treasure instead of healing.
 export const LOOT_TREASURE_CHANCE = 0.5;
@@ -202,11 +261,19 @@ export const HEAVY_ARMOR_BLOCK_BONUS = 1;
 // Extra damage per 斬 when 連斬 sees more than one 斬 in an encounter.
 export const CHAIN_SLASH_DAMAGE_PER_SLASH = 1;
 
+// Number of 斬 required in one encounter to activate 連斬.
+export const CHAIN_SLASH_MINIMUM_SLASHES = 2;
+
 // Maximum local bonus from 連斬.
 export const MAX_CHAIN_SLASH_BONUS = 1;
 
+// --- Merchant values ---
+
 // Treasure required to open the merchant after a round or encounter.
 export const MERCHANT_THRESHOLD = 10;
+
+// Treasure paid for a blessing. null preserves the current rule: spend all treasure.
+export const MERCHANT_PURCHASE_COST = null;
 
 // Treasure paid to skip the merchant without buying a boon.
 export const MERCHANT_SKIP_COST = 5;

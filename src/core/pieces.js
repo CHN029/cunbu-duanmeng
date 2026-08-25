@@ -1,4 +1,4 @@
-import { MONSTER_COLUMNS, MONSTER_START_X, NORMAL_COLUMNS } from "./config.js?v=20260822-15";
+import { MONSTER_COLUMNS, MONSTER_START_X, NORMAL_COLUMNS } from "./config.js?v=20260824-3";
 
 export function createNormalPiece(blocks) {
   const startX = Math.floor((NORMAL_COLUMNS - blocks.length) / 2);

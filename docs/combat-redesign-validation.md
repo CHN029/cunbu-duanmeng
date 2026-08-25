@@ -1,84 +1,61 @@
 # Combat Redesign Validation
 
-## Prototype Implemented
+## Implemented Prototype
 
-This pass replaces the previous delayed Doom wager with the finite Curse chain described in
-`base-systems-redesign-requirements.md`.
+- `劍` has zero normal-generation weight.
+- Ordinary `斬` has intrinsic damage through the shared core combat calculation.
+- `機` pairs with one `斬` in its row and turns that Slash into `必殺`.
+- `甲` grants capped persistent Guard in core logic.
+- Every resolved `呪` adds one pending Curse charge.
+- A new Curse does not affect a monster in the same encounter.
+- At the start of the next applicable monster encounter, exactly one pending charge infects the
+  front monster.
+- A Cursed Monster gains +1 value.
+- Slaying the Cursed Monster grants two treasure.
+- A surviving Cursed Monster grants nothing and attacks using its remaining increased value.
+- Multiple Curse charges queue for separate future monster encounters rather than stacking on one
+  monster.
+- Cursed Slash and delayed Doom paths are not part of the current design.
 
-- `劍` no longer appears in normal block generation.
-- `斬` damage is calculated through `src/core/combatRules.js`.
-- Ordinary `斬` has intrinsic damage, independent of Sword blessings.
-- `磨鋒` gives a bounded Sword blessing bonus instead of uncapped common-block growth.
-- `機` converts one `斬` into `必殺`; each `必殺` slays one front monster.
-- `甲` adds capped persistent Guard on the player.
-- `呪` creates one finite chain: pending Curse, Cursed Monster, reward-or-attack, then end.
-- A Cursed Monster gains +1 value directly; there is no separate Doom attack bonus.
-- Slaying a Cursed Monster creates exactly one future Cursed Slash with +1 damage.
-- Additional `呪` blocks fade without starting a second Curse chain while a Curse chain is active.
+## Queue -> Commit -> Resolve Effect
 
-## Rule Scenarios
+Curse creates a delayed obligation instead of immediately taxing a row that already contains only
+three other combat resources. Once the Curse moves to the side, the player can use later queues to
+prepare Slash, Momentum, or Guard before committing the next monster encounter.
 
-`tests/combatPrototype.test.mjs` covers the first prototype checks:
+The next encounter consumes one predictable charge and creates a bounded wager: defeat one +1-value
+front monster for two treasure, or absorb its remaining attack without earning the bounty. Multiple
+Curses extend this planning pressure across encounters without creating a single extreme monster.
 
-- `劍` has 0% normal generation weight.
-- One ordinary `斬` slays a tier-1 monster.
-- `機` converts one `斬` into a front-monster kill, while remaining ordinary Slash damage still
-  affects the next monster.
-- `甲` adds Guard in an empty encounter.
-- `甲` protects against monster damage even when UI effects are not advanced.
-- `呪` remains pending through an empty encounter.
-- `呪` created in a monster encounter does not affect that encounter's monster.
-- Pending Curse attaches to the front monster, increases value by 1, and does not attach to the
-  second monster first.
-- A surviving Cursed Monster attacks with its remaining value and ends the chain without reward.
-- Guard can absorb a Cursed Monster attack but still does not earn the reward.
-- Ordinary Slash damage and Momentum can both slay a Cursed Monster and create the future Cursed
-  Slash reward.
-- The reward does not empower a Slash in the same encounter that earned it.
-- A Cursed Slash displays and applies +1 damage through `src/core/combatRules.js`.
-- A Cursed Slash is consumed even if it resolves without monsters.
-- A second Curse is replaced while a chain is active.
+## Verified Rule Scenarios
 
-## Queue -> Commit -> Resolve Effects
+`tests/combatPrototype.test.mjs` validates:
 
-Guard gives the player a reason to accept a weaker current row because protection can be banked for
-future encounters. Slash remains better when the current row contains threats that should be
-removed immediately.
-
-Curse now asks the player to prepare for a later harder monster in exchange for one stronger Slash
-afterward. A `呪` created in the current encounter waits for a later encounter, so it cannot
-retroactively change the monster already committed in that row. The reward is explicitly
-future-facing; it cannot empower the same encounter that earned it.
-
-Momentum changes which effects the player wants to resolve together: it needs at least one `斬`,
-and it is wasted without monsters. Its power is capped by available Slashes and current monsters
-instead of multiplying all damage.
-
-Sword progression now belongs to merchant blessings. A run without Sword blessings still has
-intrinsic Slash damage and Momentum one-hit kills, so basic combat does not depend on seeing
-`磨鋒`.
+- Base Slash and Momentum behavior.
+- Persistent Guard and animation-independent rule application.
+- Curse persistence through empty encounters.
+- Intentional delayed infection when Curse and a monster share an encounter.
+- One-charge consumption and front-monster targeting.
+- Increased Cursed Monster value and attack.
+- No bounty on failure or Guard absorption.
+- Two-treasure rewards from ordinary and Momentum kills.
+- Target-specific bounty with another surviving monster.
+- Multiple Curses queueing without disappearing.
+- A new Curse during a cursed encounter waiting for a later encounter.
 
 ## Provisional Values
 
 - Ordinary Slash intrinsic damage: 1.
-- Sword blessing cap: 2.
-- Guard cap: 6.
-- Opening: one `必殺` per `機`.
 - Cursed Monster value bonus: +1.
-- Cursed Slash damage bonus: +1.
-- `連斬`: currently bounded to +1 local Slash damage when more than one `斬` is present.
+- Cursed Monster bounty: +2 treasure.
+- Guard cap: 6.
+- Sword blessing cap: 2.
+- `連斬` local bonus cap: +1.
 
-## Removed Doom Paths
+These are first-balance values, not final balance claims.
 
-- Removed `pendingDoom` player state.
-- Removed `CURSE_BLOCK_DOOM_GAIN`, `DOOM_REWARD_TREASURE_GAIN`, and the old Doom attack/reward
-  resolution path.
-- Removed Doom labels from the panel; the panel now shows `呪` while a future monster curse is pending.
-- Removed the treasure reward for killing all cursed/applicable monsters.
+## Next Phase
 
-## Known Follow-Up
-
-- Add more deterministic tests around cascaded encounters and future-run marking.
-- Review whether `磨鋒` should stack to cap, upgrade, or be excluded once capped.
-- Review whether `連斬` should remain as a bounded modifier or become a different Sword blessing.
-- Review whether active-chain `呪` fading is the right deterministic suppression rule.
+With the deterministic suite green, the next design phase is blessing review and tuning. Full-run
+balance should be revisited after blessing effects, caps, exclusions, and merchant offers are
+stable.

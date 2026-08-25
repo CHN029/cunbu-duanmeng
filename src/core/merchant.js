@@ -1,12 +1,24 @@
-import { MERCHANT_OPTION_COUNT, MERCHANT_SKIP_COST, MERCHANT_THRESHOLD } from "./config.js?v=20260822-15";
+import {
+  HEAVY_ARMOR_BLOCK_BONUS,
+  LOOT_CHANCE_BLESSING_BONUS,
+  MERCHANT_OPTION_COUNT,
+  MERCHANT_SKIP_COST,
+  MERCHANT_THRESHOLD,
+  SHARPEN_SWORD_SKILL_GAIN,
+  TEMPER_BODY_BODY_GAIN,
+  TEMPER_BODY_MAX_BODY_GAIN,
+} from "./config.js?v=20260824-3";
+import { toChineseNumber } from "../ui/chineseNumbers.js?v=20260821-1";
 
 export const MERCHANT_OPTIONS = [
   { id: "renewal", label: "回春", description: "體魄復滿", path: "general", category: "instant" },
-  { id: "sharpen", label: "磨鋒", description: "斬傷加一", path: "swordsman", category: "instant" },
+  { id: "sharpen", label: "磨鋒", description: `斬傷加${toChineseNumber(SHARPEN_SWORD_SKILL_GAIN)}`, path: "swordsman", category: "instant" },
   { id: "chainSlash", label: "連斬", description: "多斬增傷", path: "swordsman", category: "modifier" },
-  { id: "temperBody", label: "鍊體", description: "根骨體魄加二", path: "ironBody", category: "instant" },
-  { id: "heavyArmor", label: "重甲", description: "甲值加一", path: "ironBody", category: "modifier" },
-  { id: "lootCraft", label: "斬奪", description: "奪率加一成", path: "general", category: "modifier" },
+  { id: "temperBody", label: "鍊體", description: TEMPER_BODY_MAX_BODY_GAIN === TEMPER_BODY_BODY_GAIN
+    ? `根骨體魄加${toChineseNumber(TEMPER_BODY_MAX_BODY_GAIN)}`
+    : `根骨加${toChineseNumber(TEMPER_BODY_MAX_BODY_GAIN)}體魄加${toChineseNumber(TEMPER_BODY_BODY_GAIN)}`, path: "ironBody", category: "instant" },
+  { id: "heavyArmor", label: "重甲", description: `甲值加${toChineseNumber(HEAVY_ARMOR_BLOCK_BONUS)}`, path: "ironBody", category: "modifier" },
+  { id: "lootCraft", label: "斬奪", description: `奪率加百分之${toChineseNumber(Math.round(LOOT_CHANCE_BLESSING_BONUS * 100))}`, path: "general", category: "modifier" },
 ];
 
 export function isModifierBlessing(blessing) {
