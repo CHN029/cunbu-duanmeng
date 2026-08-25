@@ -27,12 +27,13 @@ export function createCanvasRenderer(canvas) {
       const laneGap = canvas.width - cell * game.width;
       const normalDropProgress = options.normalDropProgress ?? 0;
       const monsterDropProgress = options.monsterDropProgress ?? 0;
+      const pauseProgress = options.pauseProgress ?? (game.paused ? 1 : 0);
 
       context.clearRect(0, 0, canvas.width, canvas.height);
       drawBackground(context, canvas);
       if (game.merchant) {
         drawMerchant(context, canvas, game.merchant);
-        drawOverlay(context, canvas, game);
+        drawOverlay(context, canvas, game, pauseProgress);
         return;
       }
       drawGrid(context, game.width, game.height, cell, game.normalColumns, laneGap);
@@ -44,7 +45,7 @@ export function createCanvasRenderer(canvas) {
       drawPiece(context, game.active.monsters, cell, game.normalColumns, laneGap, game, monsterDropProgress);
       drawLaneDivider(context, canvas, game.normalColumns, cell, laneGap);
       drawEffects(context, game.effects, cell, game.normalColumns, laneGap);
-      drawOverlay(context, canvas, game);
+      drawOverlay(context, canvas, game, pauseProgress);
     },
   };
 }
@@ -133,7 +134,7 @@ function drawPiece(context, piece, cell, normalColumns, laneGap, game, yOffset =
 
 function drawLandingGhost(context, game, cell, laneGap, dropProgress) {
   const piece = game.active.normal;
-  if (!piece || !piece.blocks.some((block) => block.y >= -1) || game.gameOver || game.runComplete || game.encounter || game.merchant) return;
+  if (!piece || !piece.blocks.some((block) => block.y >= -1) || game.paused || game.gameOver || game.runComplete || game.encounter || game.merchant) return;
 
   const landing = getSettledLandingPiece(game.board, piece, 0, game.normalColumns - 1);
   if (landing.blocks.every((block, index) => block.y === piece.blocks[index].y)) return;
@@ -744,17 +745,85 @@ function drawLaneDivider(context, canvas, normalColumns, cell, laneGap) {
   context.stroke();
 }
 
-function drawOverlay(context, canvas, game) {
-  if (!game.gameOver && !game.paused && !game.runComplete) return;
+function drawOverlay(context, canvas, game, pauseProgress = 0) {
+  const isEnding = game.gameOver || game.runComplete;
+  if (!isEnding && pauseProgress <= 0) return;
 
+  context.save();
+  context.globalAlpha = isEnding ? 1 : pauseProgress;
   context.fillStyle = COLORS.overlay;
   context.fillRect(0, 0, canvas.width, canvas.height);
 
   const label = game.gameOver ? "折戟沉沙" : game.runComplete ? "克敵制勝" : "按兵不動";
-  drawVerticalLabel(context, canvas, label);
+  if (isEnding) drawVerticalLabel(context, canvas, label);
+  else drawPauseBookmark(context, canvas, label);
+  context.restore();
 }
 
-function drawVerticalLabel(context, canvas, label) {
+function drawPauseBookmark(context, canvas, label) {
+  const cssWidth = canvas.getBoundingClientRect().width;
+  const pixelRatio = window.devicePixelRatio || 1;
+  context.save();
+  context.translate(0, -10 * pixelRatio);
+  const fontSize = (cssWidth <= 280 ? 46 : 36) * pixelRatio;
+  const textHeight = fontSize + (label.length - 1) * fontSize * 1.08;
+  const ornamentWidth = 48 * pixelRatio;
+  const ornamentHeight = 22 * pixelRatio;
+  const outerPadding = 42 * pixelRatio;
+  const frameHeight = textHeight + 2 * (ornamentHeight + 14 * pixelRatio) + outerPadding * 2;
+  const centerX = canvas.width / 2;
+  const centerY = canvas.height / 2;
+  const frameTop = centerY - frameHeight / 2;
+  const pauseInk = "#302e29";
+
+  context.strokeStyle = pauseInk;
+  context.lineWidth = 1.25 * pixelRatio;
+  context.strokeRect(centerX - ornamentWidth / 2, frameTop, ornamentWidth, frameHeight);
+
+  drawBookmarkOrnament(context, centerX, frameTop + outerPadding, ornamentWidth, ornamentHeight, pixelRatio, false, pauseInk);
+  drawBookmarkOrnament(context, centerX, frameTop + frameHeight - outerPadding, ornamentWidth, ornamentHeight, pixelRatio, true, pauseInk);
+  drawVerticalLabel(context, canvas, label, `400`, `"Zhaohua", serif`, pauseInk);
+  context.restore();
+}
+
+function drawBookmarkOrnament(context, centerX, edgeY, width, height, pixelRatio, flip, color) {
+  context.save();
+  context.translate(centerX, edgeY);
+  if (flip) context.scale(1, -1);
+
+  const left = -width / 2;
+  const right = width / 2;
+  context.fillStyle = color;
+  context.beginPath();
+  context.moveTo(left, 0);
+  context.lineTo(right, 0);
+  context.lineTo(right, height);
+  context.lineTo(0, height * 0.55);
+  context.lineTo(left, height);
+  context.closePath();
+  context.fill();
+
+  const traceGap = 2.5 * pixelRatio;
+  context.strokeStyle = color;
+  context.lineWidth = 1.75 * pixelRatio;
+  context.lineCap = "butt";
+  context.lineJoin = "miter";
+  context.beginPath();
+  context.moveTo(left, height + traceGap);
+  context.lineTo(0, height * 0.55 + traceGap);
+  context.lineTo(right, height + traceGap);
+  context.stroke();
+
+  context.strokeStyle = color;
+  context.lineWidth = 1.75 * pixelRatio;
+  context.beginPath();
+  context.moveTo(left, -traceGap);
+  context.lineTo(right, -traceGap);
+  context.stroke();
+  context.restore();
+}
+
+function drawVerticalLabel(context, canvas, label, weight = `500`, family = `"Huiwen-Fangsong", "STFangsong", "Songti TC", serif`, color = COLORS.ink) {
   const centerX = Math.round(canvas.width / 2);
   const centerY = Math.round(canvas.height / 2);
   const cssWidth = canvas.getBoundingClientRect().width;
@@ -763,8 +832,8 @@ function drawVerticalLabel(context, canvas, label) {
   const gap = fontSize * 1.08;
   const startY = centerY - ((label.length - 1) * gap) / 2;
 
-  context.fillStyle = COLORS.ink;
-  context.font = `500 ${fontSize}px "Huiwen-Fangsong", "STFangsong", "Songti TC", serif`;
+  context.fillStyle = color;
+  context.font = `${weight} ${fontSize}px ${family}`;
   context.textAlign = "center";
   context.textBaseline = "middle";
 

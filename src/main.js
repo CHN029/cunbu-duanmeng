@@ -19,10 +19,11 @@ import {
   skipMerchant,
   tick,
   tickMonsters,
+  togglePause,
   updateBoardAnimations,
   updateEncounter,
 } from "./core/game.js?v=20260825-4";
-import { createCanvasRenderer } from "./renderers/canvasRenderer.js?v=20260825-100";
+import { createCanvasRenderer } from "./renderers/canvasRenderer.js?v=20260825-112";
 import { COLORS } from "./theme/colors.js?v=20260825-23";
 import { bindInput, bindSwipeInput } from "./ui/input.js?v=20260825-2";
 import { toChineseNumber } from "./ui/chineseNumbers.js?v=20260821-1";
@@ -33,6 +34,7 @@ const cover = document.querySelector("#cover");
 const canvas = document.querySelector("#game");
 const upcoming = document.querySelector("#upcoming");
 const round = document.querySelector("#round");
+const pauseRun = document.querySelector("#pause-run");
 const bodyMeter = document.querySelector("#body-meter");
 const treasure = document.querySelector("#treasure");
 const blessings = document.querySelector("#blessings");
@@ -40,6 +42,8 @@ const newRun = document.querySelector("#new-run");
 const showShop = document.querySelector("#show-shop");
 
 const ROLL_STEP_MS = 130;
+const PAUSE_FADE_MS = 240;
+const RESUME_HOLD_MS = 360;
 
 let game = null;
 let renderer = createCanvasRenderer(canvas);
@@ -49,6 +53,8 @@ let dropCounter = 0;
 let monsterDropCounter = 0;
 let upcomingKey = "";
 let runReadyAt = 0;
+let pauseVisual = 0;
+let wasPaused = false;
 const rollingStats = {
   treasure: createRollingStat(),
 };
@@ -60,12 +66,13 @@ bindInput(
     dropCounter = 0;
     monsterDropCounter = 0;
   },
-  render,
+  handleGameChange,
 );
-bindSwipeInput(document.body, () => (uiTime >= runReadyAt ? game : null), render);
+bindSwipeInput(document.body, () => (uiTime >= runReadyAt ? game : null), handleGameChange);
 cover.addEventListener("click", dismissCover);
 document.addEventListener("keydown", dismissCover);
 newRun.addEventListener("click", handleNewRun);
+pauseRun.addEventListener("click", handlePauseControl);
 showShop.addEventListener("click", openShopPreview);
 canvas.addEventListener("click", handleCanvasClick);
 
@@ -77,6 +84,9 @@ function loop(time) {
   uiTime = time;
   const ready = game && time >= runReadyAt;
   const running = ready && !game.paused && !game.gameOver && !game.runComplete && !game.encounterGate && !game.merchant;
+
+  if (game?.paused) pauseVisual = Math.min(1, pauseVisual + delta / PAUSE_FADE_MS);
+  else pauseVisual = Math.max(0, pauseVisual - delta / PAUSE_FADE_MS);
 
   if (ready && !game.paused) {
     updateUiEffects(game, delta);
@@ -118,13 +128,15 @@ function render() {
   }
 
   document.body.classList.remove("is-idle");
-  const running = !game.paused && !game.gameOver && !game.runComplete && !game.encounterGate && !game.merchant;
+  document.body.classList.toggle("is-paused", game.paused);
+  const running = uiTime >= runReadyAt && !game.paused && !game.gameOver && !game.runComplete && !game.encounterGate && !game.merchant;
   const normalDropProgress = running && !game.encounter && canMove(game, 0, 1) ? getStepDropProgress(dropCounter) : 0;
   const monsterDropProgress = running && !game.encounter && canMonstersDrop(game) ? getMonsterStepDropProgress(monsterDropCounter) : 0;
 
-  renderer.draw(game, { normalDropProgress, monsterDropProgress });
+  renderer.draw(game, { normalDropProgress, monsterDropProgress, pauseProgress: pauseVisual });
   round.textContent = `第${toChineseNumber(getEncounterDisplayCount())}回`;
   newRun.textContent = "週而復始";
+  pauseRun.hidden = game.paused || game.gameOver || game.runComplete || Boolean(game.merchant);
   renderBodyMeter();
   renderRollingStat(treasure, rollingStats.treasure, getVisibleTreasure());
   renderUpcoming();
@@ -135,6 +147,7 @@ function render() {
 
 function renderIdle() {
   document.body.classList.add("is-idle");
+  document.body.classList.remove("is-paused");
   renderer.drawIdle({ width: BOARD_WIDTH, height: BOARD_HEIGHT, normalColumns: NORMAL_COLUMNS });
   round.textContent = "第一回";
   renderBodyDots(INITIAL_MAX_BODY, 0);
@@ -150,6 +163,15 @@ function renderIdle() {
   uiEffects.replaceChildren();
   renderPanelEffects();
   newRun.textContent = "週而復始";
+  pauseRun.hidden = true;
+}
+
+function handleGameChange() {
+  const paused = Boolean(game?.paused);
+  if (wasPaused && !paused) runReadyAt = performance.now() + RESUME_HOLD_MS;
+  if (!game) pauseVisual = 0;
+  wasPaused = paused;
+  render();
 }
 
 function getStepDropProgress(elapsed) {
@@ -330,6 +352,7 @@ function renderPanelEffects() {
   const hasBodyShake = hasActiveUiEffect("body", "shake");
 
   bodyMeter.classList.toggle("hp-shake", hasBodyShake);
+  canvas.classList.toggle("board-shake", hasBodyShake);
 }
 
 function hasActiveUiEffect(target, type) {
@@ -504,6 +527,12 @@ function handleNewRun() {
   startRun();
 }
 
+function handlePauseControl() {
+  if (!game || uiTime < runReadyAt || game.gameOver || game.runComplete || game.merchant) return;
+  togglePause(game);
+  handleGameChange();
+}
+
 function startRun(readyDelay = 0) {
   document.body.classList.remove("is-cover-exiting");
   game = createGame();
@@ -511,6 +540,8 @@ function startRun(readyDelay = 0) {
   dropCounter = 0;
   monsterDropCounter = 0;
   upcomingKey = "";
+  pauseVisual = 0;
+  wasPaused = false;
   newRun.textContent = "週而復始";
   render();
 }
@@ -534,6 +565,12 @@ function openShopPreview() {
 function handleCanvasClick(event) {
   if (!game) {
     startRun();
+    return;
+  }
+
+  if (game.paused) {
+    togglePause(game);
+    handleGameChange();
     return;
   }
 
