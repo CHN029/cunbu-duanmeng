@@ -1,11 +1,12 @@
-# 寸步短夢
+# 随手無常記
 
-A lightweight falling-block roguelike prototype using plain HTML, CSS, JavaScript modules, and Canvas 2D.
+A lightweight falling-block roguelike built with plain HTML, CSS, JavaScript modules, and Canvas 2D.
 
 ## Docs
 
 - [Architecture](./docs/architecture.md)
 - [Gameplay](./docs/gameplay.md)
+- [Balancing](./docs/balancing.md)
 
 ## Run
 
@@ -17,9 +18,11 @@ python3 -m http.server 5173
 
 ## Controls
 
-- Esc: pause or unpause
-- R: new run
+- Esc: pause or resume
+- R: leave the current run
 - Left arrow: move blocks left
 - Right arrow: move blocks right
-- Down arrow: straight fall
-- Space: rotate blocks if more than one block is falling, or select in the merchant view
+- Down arrow: hard-drop
+- Space: rotate, resume from pause, or select in the merchant
+
+Touch controls and the complete rules are documented in [Gameplay](./docs/gameplay.md).

@@ -1,224 +1,254 @@
 # Architecture
 
-This project is a lightweight falling-block roguelike built with plain HTML, CSS, JavaScript modules, and Canvas 2D. The main architectural goal is to keep game rules independent from rendering, so the board visualization can later move to SVG assets, PixiJS, WebGL, or another renderer without rewriting the core loop.
+`随手無常記` is a dependency-free browser game built with HTML, CSS, JavaScript modules, DOM UI,
+and Canvas 2D. The architecture keeps rules in `src/core`, browser coordination in `src/main.js`
+and `src/ui`, and drawing in `src/renderers`.
 
-## Runtime Shape
+The central rule is that game outcomes are committed in core state before their animations play.
+Renderers may read state, but they must not decide damage, healing, Guard, rewards, generation, or
+run progression.
 
-`index.html` loads `src/main.js` as the browser entry point. `main.js` owns the browser loop, DOM updates, canvas click handling, and wiring between input, the game core, and the renderer.
+## Entry Point And Runtime Loop
 
-The shared game object is created by `createGame()` in `src/core/game.js`. It contains:
+`index.html` defines four visible layers:
 
-- board dimensions and lane counts
-- settled board blocks
-- active falling normal and monster pieces
-- pregenerated run state
-- upcoming block preview from unstarted pregenerated rounds
-- player stats and blessings
-- encounter state
-- merchant state
-- transient visual effects
-- pause, game-over, and completion flags
+- the cover screen
+- the upcoming-block strip and game canvas
+- the round/stats side panel
+- a DOM layer for effects that travel between the board and stats
 
-`main.js` calls `tick(game)` for falling-block progression and `updateEncounter(game, delta)` for encounter animation/resolution. `game.js` delegates encounter internals to `encounterOrchestrator.js`, then decides whether the run should continue, open the merchant, or start another encounter. The renderer receives the whole game state, but should not mutate it.
+It loads `src/main.js`, which owns the browser runtime:
+
+- creates and replaces the current game object
+- runs the `requestAnimationFrame` loop
+- maintains normal- and monster-drop clocks
+- updates encounters, board transitions, and UI effects
+- maps core state into the DOM stats and upcoming strip
+- passes immutable-by-convention state to the canvas renderer
+- coordinates the cover fade, initial ready delay, pause fade, and resume delay
+- wires keyboard, pointer, swipe, canvas, and mobile pause controls
+
+Normal blocks fall on an 800 ms clock. Monster blocks use an independent 115 ms clock. Movement is
+drawn between logical cells, but collision and locking use the discrete board state. While paused,
+in the merchant, resolving an encounter, or showing an ending, the relevant clocks stop.
+
+The cover fades for 900 ms. The game is then created and rendered, followed by a 1.3 second ready
+interval before input and falling begin. Resuming from pause holds the visible board for 360 ms.
+
+## Shared Game State
+
+`createGame()` in `src/core/game.js` creates the single mutable game object. Its main fields are:
+
+- board dimensions and the normal/monster lane split
+- the settled 6 × 9 board
+- active normal and monster pieces
+- lazily generated run rounds and the current round index
+- player health, maximum health, Sword bonus, treasure, Guard, pending Curses, and blessings
+- completed encounter count, which selects the difficulty phase
+- encounter, merchant, pause, loss, and completion state
+- encounter and settling gates
+- canvas effects, DOM UI effects, gravity animations, and exit animations
+
+The runtime is effectively a small phase machine:
+
+```text
+cover -> ready -> falling -> settling -> encounter -> settling
+                                  |                    |
+                                  +------ merchant <---+
+
+Any active run may enter pause. Falling can end in loss or completion.
+```
+
+`game.js` owns transitions between these phases. `encounterOrchestrator.js` owns only the internal
+steps of an encounter and reports when it is finished.
 
 ## Core Modules
 
-`src/core/game.js`
+### `src/core/config.js`
 
-The central orchestrator. It coordinates the lifecycle of a run:
+The balance and timing surface. It contains board dimensions, clock durations, run length,
+generation curves, difficulty phases, starting stats, combat values, reward chances, caps, and
+merchant costs. New tunable numbers belong here rather than inside rule or renderer modules.
 
-- create a new game
-- spawn rounds
-- move, rotate, and hard-drop active pieces
-- lock pieces into the board
-- trigger encounters
-- delegate encounter event resolution
-- open and close merchant views
-- pause, resume, win, and lose
+Some retained constants represent disabled or superseded prototypes. A constant is not proof that a
+mechanism is active; follow its call site and feature flag.
 
-This file should stay focused on sequencing. If a rule becomes self-contained, prefer moving it into a smaller core module.
+### `src/core/game.js`
 
-`src/core/encounterOrchestrator.js`
+The run orchestrator. It:
 
-Owns encounter-specific sequencing and effects:
+- creates a run and spawns rounds
+- moves, rotates, drops, locks, and settles pieces
+- advances normal and monster lanes independently
+- detects spawn collisions and a full normal bottom row
+- pairs `機` with `斬` on settled rows
+- starts and finishes encounters
+- advances board-removal, damage-reveal, curse-reveal, hit, exit, and gravity animations
+- opens, applies, skips, and closes merchant visits
+- applies purchase-time blessings
+- pauses, completes, or ends a run
 
-- build the encounter queue from the bottom row
-- resolve non-attacking blocks before `斬`
-- apply normal block effects
-- calculate slash damage and bleed-over
-- apply monster attacks, Curse chain state, and Guard
-- roll `奪` rewards from slain monsters
-- create encounter visual effects
-- clear slain monsters and collapse the board after an encounter
+### `src/core/runOrchestrator.js`
 
-It mutates the shared game state during an encounter, but it does not decide the next run phase. After an encounter ends, `game.js` decides whether to start another encounter, open the merchant, spawn the next round, or stop because the player lost.
+Creates rounds lazily. It generates enough future rounds to start the next round or fill the preview
+without consuming previewed blocks. Difficulty is based on completed encounters, not round number.
+The module owns:
 
-Support block rule changes are applied here immediately. `src/core/uiEffects.js` is presentation-only:
-traveling glyphs, shakes, and timing should represent already-committed state, not decide whether
-healing, treasure, sword skill, or Guard exists.
+- phase selection
+- monster-count curves
+- monster-tier curves
+- phase-based monster value bonuses
+- weighted normal-block selection
+- percentage-table validation
 
-`src/core/combatRules.js`
+The current formulas and tuning order are documented in [Balancing](./balancing.md).
 
-Shared combat calculations used by both resolution and display:
+### `src/core/encounterOrchestrator.js`
 
-- ordinary Slash damage
-- local encounter bonuses
-- bounded Sword blessing bonuses
-- `必殺` Slash selection from Momentum
-- encounter event lookup helpers
+Builds the bottom-row encounter snapshot and resolves three ordered groups: support, Slash, then
+monsters. It owns:
 
-Keep displayed attack values and resolved attack values routed through this module so the canvas
-does not invent gameplay numbers.
+- support effects and their state changes
+- aggregate ordinary Slash damage and instant Slash kills
+- damage carry-over between current bottom-row monsters
+- monster targeting and attacks
+- Guard absorption
+- pending-Curse attachment and Cursed Monster rewards
+- optional `奪` rolls behind its feature flag
+- encounter effect creation and cleanup
 
-`src/core/config.js`
+Support events and monster events use left-to-right order. The Slash group removes all current Slash
+blocks together, resolves instant kills, then applies pooled ordinary damage.
 
-Shared constants and the main balance-tuning surface:
+### `src/core/combatRules.js`
 
-- board size
-- lane layout
-- timing values
-- run length and per-round block counts
-- monster-count probabilities
-- normal and monster block appearance percentages
-- starting player stats
-- block effect amounts
-- monster values
-- loot probabilities and reward values
-- merchant thresholds and costs
+The shared source for displayed and resolved Slash values. It combines intrinsic damage, local
+encounter bonuses, and the bounded Sword blessing bonus. It also exposes encounter-event helpers.
+Renderer damage labels must continue to use this module.
 
-Use this file when tuning numbers that are part of the game model.
+### `src/core/board.js`
 
-Each exported constant has a short comment. Keep future balance numbers here instead of burying them in rule modules; `blockTypes.js`, `runOrchestrator.js`, `merchant.js`, and `encounterOrchestrator.js` should import values from this file.
+Pure grid geometry:
 
-`src/core/blockTypes.js`
+- creates the board
+- detects a full normal bottom row
+- checks collisions
+- shifts and rotates pieces
+- settles full boards or selected columns
+- calculates the direct landing position
+- calculates the post-settle ghost position, including lower gaps
 
-Block catalogue. It defines the glyph, name, lane, and optional value for each block type.
+### `src/core/pieces.js`
 
-Current normal blocks:
+Turns block templates into active pieces. The two normal blocks begin as one player-controlled piece.
+Monster blocks fall independently; a single monster chooses one of the two monster columns.
 
-- `藥`: healing
-- `斬`: slash attack
-- `呪`: curse
-- `寶`: treasure
-- `機`: opening / momentum
-- `甲`: armor/shield
+### `src/core/blockTypes.js`
 
-The retained `劍` block type is deprecated for normal generation during the current combat
-prototype. Sword progression is tested through bounded merchant blessings instead.
+The block catalogue: labels, English development names, lanes, and base values. `劍` remains in the
+catalogue for compatibility but has zero normal-generation weight.
 
-Current monster blocks:
+### `src/core/merchant.js`
 
-- `獸`: value 1
-- `賊`: value 2
-- `兇`: value 3
+Defines blessing metadata, chooses three random offers, creates merchant state, checks opening and
+skip conditions, and wraps selection. `game.js` owns purchases because they affect player and run
+state.
 
-`src/core/runOrchestrator.js`
+### `src/core/effects.js` and `src/core/uiEffects.js`
 
-Pregenerates the 80-round run. Each round currently contains two normal blocks and zero to two monster blocks. Normal block types and monster block tiers are selected through percentage tables from `config.js`, so balance can be adjusted without changing generation logic. Each table should add up to 100. This module also exposes a peek helper for the upcoming-block UI, which reads from rounds that have not started yet without consuming them. This is the right place to tune drop distribution, pacing, monster frequency, and future run scripting.
+Small lifetime stores for presentation data. Canvas effects cover board-local visuals such as Slash
+paths. UI effects cover traveling glyphs, stat expansion, and shake state. They describe effects
+that visualize already-applied rules.
 
-`src/core/board.js`
+## Input And DOM UI
 
-Pure board and piece geometry helpers:
+### `src/ui/input.js`
 
-- create an empty board
-- check the normal bottom row
-- collapse columns downward
-- collision detection
-- shift and rotate pieces
+Maps keyboard input by mode and handles touch swipes. It receives accessors and callbacks rather
+than importing browser state from `main.js`. Merchant input overrides normal-play input.
 
-This module should remain mostly free of gameplay meaning.
+### `src/ui/chineseNumbers.js`
 
-`src/core/pieces.js`
+Formats numeric UI values as Chinese text, including zero as `無`.
 
-Creates active falling pieces from block templates. Normal pieces spawn in the normal lane; monster pieces spawn in the monster lane and choose a monster column when needed.
+### DOM responsibilities in `src/main.js`
 
-`src/core/effects.js`
+The side panel is DOM-based rather than canvas-based. `main.js` renders:
 
-Stores and ages temporary visual effects, such as expanding `斬` or `奪` glyphs. Effects are game-state data, but their exact drawing belongs to renderers.
+- encounter count
+- health dots and circular Guard marks
+- rolling treasure text
+- stacked lasting-blessing tags
+- pending-Curse count
+- six upcoming blocks
+- glyphs traveling from board cells to stats, or from the Curse tag to a monster
 
-`src/core/merchant.js`
+Treasure rewards from a Cursed Monster are committed immediately but temporarily withheld from the
+display total until their traveling glyphs arrive.
 
-Merchant configuration and selection helpers:
+## Rendering
 
-- shop title
-- boon options
-- threshold and skip checks
-- selection movement
-- merchant state creation
+### `src/renderers/canvasRenderer.js`
 
-The actual spending and blessing recording is still coordinated by `game.js` because it changes player/run flow.
+Draws the paper background, corner-mark grid, settled blocks, active pieces, post-settle landing
+ghost, encounter gate, damage values, animations, lane separation, and pause/end overlays. It also:
 
-## UI Modules
+- keeps Canvas resolution aligned with CSS size and device pixel ratio
+- interpolates visual falling without changing logical positions
+- fades the landing ghost as the active piece approaches it
+- shows Slash paths, monster hit shake, damage reveal, and slain marks
+- morphs a cursed monster into its cursed glyph after the Curse arrives
+- dims the board during pause while leaving its state visible
 
-`src/ui/input.js`
+The pause bookmark uses the Zhaohua font. Ending labels and gameplay glyphs use Huiwen-Fangsong.
 
-Maps keyboard input to game actions. It is aware of merchant mode, because the same keys have different meanings when the shop is open.
+### `src/renderers/merchantRenderer.js`
 
-Normal play:
+Replaces the board view with the vertical merchant composition. It receives merchant state rather
+than the full game object.
 
-- Escape pauses/unpauses
-- R starts a new run
-- Left/Right move the normal piece
-- Down hard-drops
-- Space rotates, or unpauses when paused
+### `src/theme/colors.js`
 
-Merchant:
-
-- Left/Right move selection
-- Space or Enter selects
-- 1-3 choose a visible boon directly
-- S skips
-- R starts a new run
-
-`src/ui/chineseNumbers.js`
-
-Shared Traditional Chinese number formatting for the stats panel and merchant copy.
-
-## Theme Modules
-
-`src/theme/colors.js`
-
-Central palette for JavaScript-rendered colors, especially Canvas 2D rendering and encounter effect colors. Use this file when changing block corner colors, glyph colors, overlays, merchant highlights, or animated effect colors.
-
-## Rendering Modules
-
-`src/renderers/canvasRenderer.js`
-
-The main Canvas 2D renderer. It draws:
-
-- board background
-- settled blocks
-- active falling pieces
-- lane divider
-- expanding effects
-- pause/win/loss overlays
-
-It delegates merchant rendering to `merchantRenderer.js`.
-
-`src/renderers/merchantRenderer.js`
-
-Draws the merchant view on the canvas. It receives merchant state only, not the full game object. This keeps the shop view easier to restyle or replace.
+Central palette for JavaScript-drawn paper, ink, ghost, overlay, glyph, and semantic corner colors.
+CSS has corresponding variables for DOM UI.
 
 ## Styling And Assets
 
-`styles.css` handles page layout, the side panel, buttons, stat tags, and the bundled font. The visual language is intentionally spare: white and gray, no shadows, no border radius.
+`styles.css` owns responsive sizing, safe-area padding, cover and stats layout, pause dimming,
+shakes, rolling numbers, tags, and the mobile pause control. The board shrinks with viewport width
+and height so the active piece, encounter row, and monster lane remain readable together.
 
-`assets/fonts/huiwen-fangsong.ttf` provides the Huiwen-Fangsong font used across the UI and canvas glyphs.
+Bundled fonts:
 
-## Extension Guidelines
+- `YDWaosagi.otf`: cover title
+- `huiwen-fangsong.ttf`: gameplay UI and glyphs
+- `zhaohua.ttf`: pause title
 
-Keep gameplay rules in `src/core`.
+The cover and game share the warm paper background. The cover SVG aging filter is currently off.
 
-Keep browser events and DOM updates in `src/ui` or `src/main.js`.
+## Invariants And Extension Rules
 
-Keep drawing code in `src/renderers`.
+- Rules and random outcomes belong in `src/core`, never in a renderer.
+- Apply state changes immediately; use effects only to communicate them.
+- Keep displayed and resolved damage routed through `combatRules.js`.
+- Put tunable values in `config.js` and semantic canvas colors in `theme/colors.js`.
+- Keep preview reads non-consuming.
+- Do not let animation progress determine rewards or survival.
+- Add block metadata in `blockTypes.js`, resolution behavior in `encounterOrchestrator.js`, and
+  drawing only where the existing generic renderer cannot express it.
+- Add merchant metadata in `merchant.js`; apply purchase consequences in `game.js` or the relevant
+  encounter rule.
+- Preserve pause/merchant/transition guards when adding input or clocks.
 
-Tune gameplay numbers in `src/core/config.js`.
+## Verification
 
-Tune JavaScript-rendered colors in `src/theme/colors.js`.
+`tests/combatPrototype.test.mjs` is the deterministic rule-level suite. It covers landing and
+post-settle ghosts, merchant spending, Slash and Momentum, persistent Guard, queued Curse timing,
+Cursed Monster targeting/rewards/failure, board shake through armour, and representative combat
+interactions. Run it with:
 
-When adding new block types, start in `blockTypes.js`, then add encounter behavior in `encounterOrchestrator.js`.
+```sh
+node --test tests/combatPrototype.test.mjs
+```
 
-When adding new shop boons, start in `merchant.js`, then add purchase-time behavior in the merchant choice flow or encounter-time behavior in `encounterOrchestrator.js`.
-
-When adding visual feedback, store only minimal effect data in core state, then draw it in the renderer.
+Visual changes still require checking both a desktop-sized and narrow/coarse-pointer layout.
