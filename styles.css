@@ -212,8 +212,14 @@ body {
   transition: opacity 240ms ease;
 }
 
-body.is-paused .upcoming-row::after {
+body.is-paused .upcoming-row::after,
+body.is-ending .upcoming-row::after {
   opacity: 0.84;
+}
+
+body.is-ending .upcoming-row::after {
+  opacity: 0.92;
+  transition-duration: 420ms;
 }
 
 .upcoming-slot {
@@ -277,11 +283,11 @@ canvas {
   background: var(--paper);
 }
 
-canvas.board-shake {
-  animation: board-hit-shake 220ms ease-out both;
+.game-shell.ui-shake {
+  animation: ui-hit-shake 220ms ease-out both;
 }
 
-@keyframes board-hit-shake {
+@keyframes ui-hit-shake {
   0%, 100% { transform: translate(0, 0); }
   18% { transform: translate(-7px, 2px); }
   36% { transform: translate(6px, -2px); }
@@ -294,6 +300,7 @@ canvas.board-shake {
   justify-self: start;
   display: grid;
   grid-template-columns: max-content;
+  grid-template-rows: auto 1fr;
   align-items: start;
   padding: 10px 0;
   background: var(--panel);
@@ -539,21 +546,46 @@ button:focus-visible {
 
 .mobile-pause {
   display: none;
-  position: fixed;
-  right: max(12px, env(safe-area-inset-right));
-  bottom: max(12px, env(safe-area-inset-bottom));
-  z-index: 5;
+  position: relative;
+  align-self: end;
+  justify-self: center;
   width: 44px;
   min-width: 44px;
-  height: 44px;
-  border: 1px solid var(--line);
-  background: var(--paper);
-  color: var(--ink);
+  height: 68px;
+  border: 0;
+  border-radius: 2px;
+  background: #302e29;
+  color: var(--paper);
+  font-family: "Huiwen-Fangsong", "STFangsong", "Songti TC", serif;
+  font-size: 1.42rem;
   font-weight: 400;
-  letter-spacing: 0;
+  letter-spacing: 0.14em;
+  text-indent: 0.07em;
   padding: 0;
   place-items: center;
-  writing-mode: horizontal-tb;
+  line-height: 1.05;
+  writing-mode: vertical-rl;
+  text-orientation: upright;
+}
+
+.mobile-pause::before {
+  content: "";
+  position: absolute;
+  inset: 4px;
+  background:
+    linear-gradient(var(--paper), var(--paper)) left top / 8px 1px no-repeat,
+    linear-gradient(var(--paper), var(--paper)) left top / 1px 8px no-repeat,
+    linear-gradient(var(--paper), var(--paper)) right top / 8px 1px no-repeat,
+    linear-gradient(var(--paper), var(--paper)) right top / 1px 8px no-repeat,
+    linear-gradient(var(--paper), var(--paper)) left bottom / 8px 1px no-repeat,
+    linear-gradient(var(--paper), var(--paper)) left bottom / 1px 8px no-repeat,
+    linear-gradient(var(--paper), var(--paper)) right bottom / 8px 1px no-repeat,
+    linear-gradient(var(--paper), var(--paper)) right bottom / 1px 8px no-repeat;
+  pointer-events: none;
+}
+
+.mobile-pause:active {
+  transform: scale(0.96);
 }
 
 @media (hover: none), (pointer: coarse), (max-width: 560px) {

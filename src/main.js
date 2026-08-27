@@ -23,7 +23,7 @@ import {
   updateBoardAnimations,
   updateEncounter,
 } from "./core/game.js?v=20260825-5";
-import { createCanvasRenderer } from "./renderers/canvasRenderer.js?v=20260825-113";
+import { createCanvasRenderer } from "./renderers/canvasRenderer.js?v=20260827-5";
 import { COLORS } from "./theme/colors.js?v=20260825-23";
 import { bindInput, bindSwipeInput } from "./ui/input.js?v=20260825-2";
 import { toChineseNumber } from "./ui/chineseNumbers.js?v=20260821-1";
@@ -31,6 +31,7 @@ import { updateUiEffects } from "./core/uiEffects.js?v=20260824-1";
 
 const uiEffects = document.querySelector("#ui-effects");
 const cover = document.querySelector("#cover");
+const gameShell = document.querySelector(".game-shell");
 const canvas = document.querySelector("#game");
 const upcoming = document.querySelector("#upcoming");
 const round = document.querySelector("#round");
@@ -43,6 +44,7 @@ const showShop = document.querySelector("#show-shop");
 
 const ROLL_STEP_MS = 130;
 const PAUSE_FADE_MS = 240;
+const END_REVEAL_MS = 420;
 const RESUME_HOLD_MS = 360;
 
 let game = null;
@@ -54,6 +56,7 @@ let monsterDropCounter = 0;
 let upcomingKey = "";
 let runReadyAt = 0;
 let pauseVisual = 0;
+let endingVisual = 0;
 let wasPaused = false;
 const rollingStats = {
   treasure: createRollingStat(),
@@ -87,6 +90,9 @@ function loop(time) {
 
   if (game?.paused) pauseVisual = Math.min(1, pauseVisual + delta / PAUSE_FADE_MS);
   else pauseVisual = Math.max(0, pauseVisual - delta / PAUSE_FADE_MS);
+
+  if (game?.gameOver || game?.runComplete) endingVisual = Math.min(1, endingVisual + delta / END_REVEAL_MS);
+  else endingVisual = 0;
 
   if (ready && !game.paused) {
     updateUiEffects(game, delta);
@@ -129,14 +135,18 @@ function render() {
 
   document.body.classList.remove("is-idle");
   document.body.classList.toggle("is-paused", game.paused);
+  document.body.classList.toggle("is-ending", game.gameOver || game.runComplete);
   const running = uiTime >= runReadyAt && !game.paused && !game.gameOver && !game.runComplete && !game.encounterGate && !game.merchant;
   const normalDropProgress = running && !game.encounter && canMove(game, 0, 1) ? getStepDropProgress(dropCounter) : 0;
   const monsterDropProgress = running && !game.encounter && canMonstersDrop(game) ? getMonsterStepDropProgress(monsterDropCounter) : 0;
 
-  renderer.draw(game, { normalDropProgress, monsterDropProgress, pauseProgress: pauseVisual });
+  renderer.draw(game, { normalDropProgress, monsterDropProgress, pauseProgress: pauseVisual, endingProgress: endingVisual });
   round.textContent = `第${toChineseNumber(getEncounterDisplayCount())}回`;
   newRun.textContent = "週而復始";
-  pauseRun.hidden = game.paused || game.gameOver || game.runComplete || Boolean(game.merchant);
+  const isEnding = game.gameOver || game.runComplete;
+  pauseRun.textContent = isEnding ? "再來" : "止戈";
+  pauseRun.setAttribute("aria-label", isEnding ? "重新開始" : "暫歇");
+  pauseRun.hidden = game.paused || Boolean(game.merchant);
   renderBodyMeter();
   renderRollingStat(treasure, rollingStats.treasure, getVisibleTreasure());
   renderUpcoming();
@@ -148,6 +158,7 @@ function render() {
 function renderIdle() {
   document.body.classList.add("is-idle");
   document.body.classList.remove("is-paused");
+  document.body.classList.remove("is-ending");
   renderer.drawIdle({ width: BOARD_WIDTH, height: BOARD_HEIGHT, normalColumns: NORMAL_COLUMNS });
   round.textContent = "第一回";
   renderBodyDots(INITIAL_MAX_BODY, 0);
@@ -169,7 +180,10 @@ function renderIdle() {
 function handleGameChange() {
   const paused = Boolean(game?.paused);
   if (wasPaused && !paused) runReadyAt = performance.now() + RESUME_HOLD_MS;
-  if (!game) pauseVisual = 0;
+  if (!game) {
+    pauseVisual = 0;
+    endingVisual = 0;
+  }
   wasPaused = paused;
   render();
 }
@@ -350,10 +364,10 @@ function getExpandEffectVisual(center, progress) {
 
 function renderPanelEffects() {
   const hasBodyShake = hasActiveUiEffect("body", "shake");
-  const hasBoardShake = hasBodyShake || hasActiveUiEffect("board", "shake");
+  const hasUiShake = hasBodyShake || hasActiveUiEffect("board", "shake");
 
   bodyMeter.classList.toggle("hp-shake", hasBodyShake);
-  canvas.classList.toggle("board-shake", hasBoardShake);
+  gameShell.classList.toggle("ui-shake", hasUiShake);
 }
 
 function hasActiveUiEffect(target, type) {
@@ -529,7 +543,11 @@ function handleNewRun() {
 }
 
 function handlePauseControl() {
-  if (!game || uiTime < runReadyAt || game.gameOver || game.runComplete || game.merchant) return;
+  if (!game || uiTime < runReadyAt || game.merchant) return;
+  if (game.gameOver || game.runComplete) {
+    startRun();
+    return;
+  }
   togglePause(game);
   handleGameChange();
 }
@@ -542,6 +560,7 @@ function startRun(readyDelay = 0) {
   monsterDropCounter = 0;
   upcomingKey = "";
   pauseVisual = 0;
+  endingVisual = 0;
   wasPaused = false;
   newRun.textContent = "週而復始";
   render();

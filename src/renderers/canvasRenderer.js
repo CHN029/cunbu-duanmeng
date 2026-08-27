@@ -28,12 +28,13 @@ export function createCanvasRenderer(canvas) {
       const normalDropProgress = options.normalDropProgress ?? 0;
       const monsterDropProgress = options.monsterDropProgress ?? 0;
       const pauseProgress = options.pauseProgress ?? (game.paused ? 1 : 0);
+      const endingProgress = options.endingProgress ?? (game.gameOver || game.runComplete ? 1 : 0);
 
       context.clearRect(0, 0, canvas.width, canvas.height);
       drawBackground(context, canvas);
       if (game.merchant) {
         drawMerchant(context, canvas, game.merchant);
-        drawOverlay(context, canvas, game, pauseProgress);
+        drawOverlay(context, canvas, game, pauseProgress, endingProgress);
         return;
       }
       drawGrid(context, game.width, game.height, cell, game.normalColumns, laneGap);
@@ -45,7 +46,7 @@ export function createCanvasRenderer(canvas) {
       drawPiece(context, game.active.monsters, cell, game.normalColumns, laneGap, game, monsterDropProgress);
       drawLaneDivider(context, canvas, game.normalColumns, cell, laneGap);
       drawEffects(context, game.effects, cell, game.normalColumns, laneGap);
-      drawOverlay(context, canvas, game, pauseProgress);
+      drawOverlay(context, canvas, game, pauseProgress, endingProgress);
     },
   };
 }
@@ -745,32 +746,40 @@ function drawLaneDivider(context, canvas, normalColumns, cell, laneGap) {
   context.stroke();
 }
 
-function drawOverlay(context, canvas, game, pauseProgress = 0) {
+function drawOverlay(context, canvas, game, pauseProgress = 0, endingProgress = 0) {
   const isEnding = game.gameOver || game.runComplete;
-  if (!isEnding && pauseProgress <= 0) return;
+  const overlayProgress = isEnding ? endingProgress : pauseProgress;
+  if (overlayProgress <= 0) return;
 
   context.save();
-  context.globalAlpha = isEnding ? 1 : pauseProgress;
-  context.fillStyle = COLORS.overlay;
+  context.globalAlpha = overlayProgress * (isEnding ? 0.92 : 0.84);
+  context.fillStyle = COLORS.paper;
   context.fillRect(0, 0, canvas.width, canvas.height);
 
   const label = game.gameOver ? "折戟沉沙" : game.runComplete ? "克敵制勝" : "按兵不動";
-  if (isEnding) drawVerticalLabel(context, canvas, label);
-  else drawPauseBookmark(context, canvas, label);
+  if (isEnding) {
+    const promptProgress = Math.min(1, Math.max(0, (endingProgress - 0.18) / 0.82));
+    const eased = easeOutCubic(promptProgress);
+    const upcomingHeight = canvas.offsetTop - canvas.previousElementSibling.offsetTop;
+    context.globalAlpha = eased;
+    context.translate(0, (8 * (1 - eased) - upcomingHeight / 2) * (window.devicePixelRatio || 1));
+    drawVerticalLabel(context, canvas, label);
+  } else {
+    drawPauseBookmark(context, canvas, label);
+  }
   context.restore();
 }
 
 function drawPauseBookmark(context, canvas, label) {
-  const cssWidth = canvas.getBoundingClientRect().width;
   const pixelRatio = window.devicePixelRatio || 1;
-  const isNarrow = cssWidth <= 280;
+  const upcomingHeight = canvas.offsetTop - canvas.previousElementSibling.offsetTop;
   context.save();
-  context.translate(0, -10 * pixelRatio);
+  context.translate(0, -upcomingHeight * pixelRatio / 2);
   const fontSize = 36 * pixelRatio;
   const textHeight = fontSize + (label.length - 1) * fontSize * 1.08;
   const ornamentWidth = 48 * pixelRatio;
   const ornamentHeight = 22 * pixelRatio;
-  const outerPadding = (isNarrow ? 2.5 : 42) * pixelRatio;
+  const outerPadding = 2.5 * pixelRatio;
   const frameHeight = textHeight + 2 * (ornamentHeight + 14 * pixelRatio) + outerPadding * 2;
   const centerX = canvas.width / 2;
   const centerY = canvas.height / 2;
