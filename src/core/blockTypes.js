@@ -2,7 +2,6 @@ import { ARMOR_BLOCK_VALUE, BANDIT_VALUE, BEAST_VALUE, BRUTE_VALUE } from "./con
 
 export const BLOCK_TYPES = {
   B: { label: "藥", name: "Medicine", lane: "normal" },
-  D: { label: "劍", name: "Sword Skill", lane: "normal" },
   L: { label: "斬", name: "Slash", lane: "normal" },
   C: { label: "呪", name: "Curse", lane: "normal" },
   T: { label: "寶", name: "Treasure", lane: "normal" },

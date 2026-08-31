@@ -145,14 +145,23 @@ Monster blocks fall independently; a single monster chooses one of the two monst
 
 ### `src/core/blockTypes.js`
 
-The block catalogue: labels, English development names, lanes, and base values. `劍` remains in the
-catalogue for compatibility but has zero normal-generation weight.
+The block catalogue: labels, English development names, lanes, and base values.
 
 ### `src/core/merchant.js`
 
-Defines blessing metadata, chooses three random offers, creates merchant state, checks opening and
-skip conditions, and wraps selection. `game.js` owns purchases because they affect player and run
-state.
+Chooses three random offers from the loaded blessing catalogue, creates merchant state, checks
+opening and skip conditions, and wraps selection. `game.js` owns purchases because they affect
+player and run state.
+
+### `src/core/blessings.js` and `src/data/blessings.json`
+
+`src/data/blessings.json` is the authoring surface for merchant blessings: label, description, path,
+category, optional stack caps, and simple effect entries. `blessings.js` loads the JSON catalogue,
+exposes merchant options, filters capped blessings, identifies lasting modifiers, computes
+drop-weight multipliers, and applies supported effect types to the game state.
+
+The JSON file should hold tuning values for blessing effects. Code only needs to change when adding
+a new effect type that the interpreter does not already understand.
 
 ### `src/core/effects.js` and `src/core/uiEffects.js`
 
@@ -236,8 +245,8 @@ The cover and game share the warm paper background. The cover SVG aging filter i
 - Do not let animation progress determine rewards or survival.
 - Add block metadata in `blockTypes.js`, resolution behavior in `encounterOrchestrator.js`, and
   drawing only where the existing generic renderer cannot express it.
-- Add merchant metadata in `merchant.js`; apply purchase consequences in `game.js` or the relevant
-  encounter rule.
+- Add merchant blessing metadata and simple effect values in `src/data/blessings.json`; add code in
+  `blessings.js` only for new effect types.
 - Preserve pause/merchant/transition guards when adding input or clocks.
 
 ## Verification

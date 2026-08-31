@@ -1,11 +1,12 @@
-import { CHAIN_SLASH_DAMAGE_PER_SLASH, CHAIN_SLASH_MINIMUM_SLASHES, MAX_CHAIN_SLASH_BONUS, SLASH_INTRINSIC_DAMAGE } from "./config.js?v=20260824-3";
+import { CHAIN_SLASH_DAMAGE_PER_SLASH, CHAIN_SLASH_MINIMUM_SLASHES, MAX_CHAIN_SLASH_BONUS, SLASH_INTRINSIC_DAMAGE } from "./config.js?v=20260831-2";
+import { hasBlessingEffect } from "./blessings.js?v=20260831-5";
 
 export function getSlashDamage(game, encounter = game.encounter, slashBlock = null) {
   return SLASH_INTRINSIC_DAMAGE + getLocalSlashBonus(game, encounter) + getSwordBlessingBonus(game);
 }
 
 export function getLocalSlashBonus(game, encounter = game.encounter) {
-  if (!game.player.blessingIds.includes("chainSlash")) return 0;
+  if (!hasBlessingEffect(game.player, "enableChainSlash")) return 0;
   if ((encounter?.slashCount ?? 0) < CHAIN_SLASH_MINIMUM_SLASHES) return 0;
 
   return Math.min(MAX_CHAIN_SLASH_BONUS, CHAIN_SLASH_DAMAGE_PER_SLASH);

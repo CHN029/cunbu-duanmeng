@@ -6,7 +6,6 @@ import {
   CURSED_MONSTER_REVEAL_MS,
   DROP_MS,
   ENCOUNTER_GATE_EXIT_MS,
-  HEAVY_ARMOR_BLOCK_BONUS,
   INSTANT_SLASH_REVEAL_MS,
   INITIAL_BODY,
   INITIAL_ARMOR_VALUE_BONUS,
@@ -15,21 +14,18 @@ import {
   INITIAL_PENDING_CURSES,
   INITIAL_SWORD_SKILL,
   INITIAL_TREASURE,
-  MAX_SWORD_SKILL,
   MERCHANT_PURCHASE_COST,
   MERCHANT_SKIP_COST,
   MONSTER_START_X,
   NORMAL_COLUMNS,
   SLAY_MARK_FADE_MS,
-  SHARPEN_SWORD_SKILL_GAIN,
-  TEMPER_BODY_BODY_GAIN,
-  TEMPER_BODY_MAX_BODY_GAIN,
   UPCOMING_BLOCK_PREVIEW_COUNT,
-} from "./config.js?v=20260824-3";
-import { clearEncounter, startEncounter, updateEncounter as updateEncounterState } from "./encounterOrchestrator.js?v=20260825-5";
-import { canSkipMerchant, createMerchant, isModifierBlessing, moveMerchantSelectionIndex, shouldOpenMerchant } from "./merchant.js?v=20260824-1";
+} from "./config.js?v=20260831-2";
+import { applyBlessingEffects, canReceiveBlessing } from "./blessings.js?v=20260831-5";
+import { clearEncounter, startEncounter, updateEncounter as updateEncounterState } from "./encounterOrchestrator.js?v=20260831-6";
+import { canSkipMerchant, createMerchant, isModifierBlessing, moveMerchantSelectionIndex, shouldOpenMerchant } from "./merchant.js?v=20260831-6";
 import { createMonsterPiece, createNormalPiece } from "./pieces.js?v=20260824-1";
-import { createRun, getDifficultyPhase, getNextRound, peekUpcomingBlocks } from "./runOrchestrator.js?v=20260825-3";
+import { createRun, getDifficultyPhase, getNextRound, peekUpcomingBlocks } from "./runOrchestrator.js?v=20260831-5";
 
 export function createGame() {
   const game = {
@@ -74,7 +70,7 @@ export function createGame() {
 }
 
 export function getUpcomingBlocks(game, count = UPCOMING_BLOCK_PREVIEW_COUNT) {
-  return peekUpcomingBlocks(game.run, count, getCurrentDifficultyPhase(game));
+  return peekUpcomingBlocks(game.run, count, getCurrentDifficultyPhase(game), game.player);
 }
 
 export function tick(game) {
@@ -315,6 +311,8 @@ export function chooseMerchantOption(game, index) {
   if (!game.merchant || !game.merchant.options[index]) return false;
 
   const option = game.merchant.options[index];
+  if (!game.merchant.preview && !canReceiveBlessing(game.player, option)) return false;
+
   const resumeWithNewRound = game.merchant.resumeWithNewRound;
   if (!game.merchant.preview) {
     applyBlessing(game, option);
@@ -362,7 +360,7 @@ export function openMerchantPreview(game) {
 }
 
 function spawnRound(game) {
-  const round = getNextRound(game.run, getCurrentDifficultyPhase(game));
+  const round = getNextRound(game.run, getCurrentDifficultyPhase(game), game.player);
 
   if (!round) {
     game.runComplete = true;
@@ -515,29 +513,13 @@ function settleNormalColumns(game) {
 }
 
 function openMerchant(game, resumeWithNewRound = true, preview = false) {
-  game.merchant = createMerchant(resumeWithNewRound, preview);
+  game.merchant = createMerchant(game.player, resumeWithNewRound, preview);
 }
 
 function applyBlessing(game, blessing) {
   if (isModifierBlessing(blessing)) game.player.blessings.push(blessing.label);
   game.player.blessingIds.push(blessing.id);
-
-  if (blessing.id === "renewal") {
-    game.player.body = game.player.maxBody;
-  }
-
-  if (blessing.id === "sharpen") {
-    game.player.swordSkill = Math.min(MAX_SWORD_SKILL, game.player.swordSkill + SHARPEN_SWORD_SKILL_GAIN);
-  }
-
-  if (blessing.id === "temperBody") {
-    game.player.maxBody += TEMPER_BODY_MAX_BODY_GAIN;
-    healPlayer(game.player, TEMPER_BODY_BODY_GAIN);
-  }
-
-  if (blessing.id === "heavyArmor") {
-    game.player.armorValueBonus += HEAVY_ARMOR_BLOCK_BONUS;
-  }
+  applyBlessingEffects(game, blessing);
 }
 
 function healPlayer(player, amount) {

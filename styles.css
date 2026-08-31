@@ -100,6 +100,12 @@ body {
   transform: translateY(-1.5%);
   color: #302e29;
   text-align: center;
+  opacity: 1;
+  transition: opacity 240ms ease;
+}
+
+.fonts-loading .cover-title {
+  opacity: 0;
 }
 
 .cover-prefix {
@@ -428,9 +434,10 @@ body.is-paused .side-panel {
 
 .blessing-tag {
   border: 1px solid var(--red-heart);
-  border-radius: 2px;
+  border-radius: 3px;
+  background: var(--red-heart);
   padding: 3px 1px;
-  color: var(--red-heart);
+  color: var(--paper);
   font-size: 0.92rem;
   line-height: 1.2;
   text-align: center;
@@ -440,7 +447,8 @@ body.is-paused .side-panel {
 
 .blessing-tag.curse-tag {
   border-color: var(--curse-blue);
-  color: var(--curse-blue);
+  background: var(--curse-blue);
+  color: var(--paper);
 }
 
 .round-actions {

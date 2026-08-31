@@ -7,12 +7,11 @@ export const COLORS = {
   ghost: "#d4d0c5",
   divider: "#111111",
   overlay: "rgba(245, 242, 233, 0.84)",
-
   red: "#a30636",
 
   corners: {
     grid: "#dddddd",
-    heal: "#58771e",
+    heal: "#00321a",
     slash: "#a30636",
     curse: "#31536d",
     treasure: "#9a622d",

@@ -1,6 +1,6 @@
 import { drawMerchant } from "./merchantRenderer.js?v=20260825-4";
 import { getSettledLandingPiece } from "../core/board.js?v=20260825-3";
-import { getEncounterEvents, getSlashDamage as getResolvedSlashDamage, isInstantSlashEvent } from "../core/combatRules.js?v=20260824-1";
+import { getEncounterEvents, getSlashDamage as getResolvedSlashDamage, isInstantSlashEvent } from "../core/combatRules.js?v=20260831-5";
 import { COLORS } from "../theme/colors.js?v=20260825-23";
 
 export function createCanvasRenderer(canvas) {
@@ -51,8 +51,33 @@ export function createCanvasRenderer(canvas) {
   };
 }
 
-function drawStartPrompt(context, canvas) {
-  drawVerticalLabel(context, canvas, "開局");
+export function createBlockStyleRenderer(canvas) {
+  const context = canvas.getContext("2d");
+  const game = {
+    board: [],
+    encounter: null,
+    gravityAnimations: [],
+    player: { armorValueBonus: 0, blessingIds: [], swordSkill: 0 },
+  };
+
+  return {
+    draw(blocks, columns = 1, getStyleGlyphColor = null, glyphFamily = null) {
+      resizeCanvasToDisplaySize(canvas);
+      const cell = canvas.width / columns;
+      game.height = Math.ceil(blocks.length / columns);
+      game.encounter = {
+        current: { events: blocks.flatMap((block, index) => block.instantSlash ? [{ type: "normal", block, x: index % columns, y: Math.floor(index / columns) }] : []) },
+        introElapsed: 0,
+        queue: [],
+      };
+      context.clearRect(0, 0, canvas.width, canvas.height);
+      drawBackground(context, canvas);
+      blocks.forEach((block, index) => drawCell(context, index % columns, Math.floor(index / columns), cell, block, columns, 0, game, {
+        glyphColor: getStyleGlyphColor?.(block) ?? null,
+        glyphFamily,
+      }));
+    },
+  };
 }
 
 function resizeCanvasToDisplaySize(canvas) {
@@ -192,7 +217,7 @@ function drawCell(context, x, y, cell, block, normalColumns, laneGap, game, visu
     return;
   }
 
-  drawBlockGlyph(context, left, top, size, block, game, x, y, isMonster);
+  drawBlockGlyph(context, left, top, size, block, game, x, y, isMonster, visual.glyphColor, visual.glyphFamily);
   if (block.slayed && !block.damageReveal) drawSlainMonsterRing(context, left, top, size, getSlayMarkAlpha(block));
 
   if (isMonster) {
@@ -220,8 +245,8 @@ function getHitShakeOffset(block, cell) {
   };
 }
 
-function drawBlockGlyph(context, left, top, size, block, game, x, y, isMonster) {
-  context.fillStyle = getGlyphColor(block);
+function drawBlockGlyph(context, left, top, size, block, game, x, y, isMonster, glyphColor = null, glyphFamily = `"Huiwen-Fangsong", "STFangsong", "Songti TC", serif`) {
+  context.fillStyle = glyphColor ?? getGlyphColor(block);
   context.textAlign = "center";
   context.textBaseline = "middle";
 
@@ -235,12 +260,13 @@ function drawBlockGlyph(context, left, top, size, block, game, x, y, isMonster) 
         y: top + size * 0.5,
         size,
         progress,
-        fromColor: COLORS.glyph,
-        color: COLORS.glyph,
+        fromColor: glyphColor ?? COLORS.glyph,
+        color: glyphColor ?? COLORS.glyph,
+        glyphFamily,
       });
       return;
     }
-    context.font = `400 ${Math.floor(size * 0.7)}px "Huiwen-Fangsong", "STFangsong", "Songti TC", serif`;
+    context.font = `400 ${Math.floor(size * 0.7)}px ${glyphFamily}`;
     context.fillText("鬼", left + size / 2, top + size * 0.5);
     return;
   }
@@ -255,31 +281,32 @@ function drawBlockGlyph(context, left, top, size, block, game, x, y, isMonster) 
         y: top + size * 0.5,
         size,
         progress,
-        fromColor: COLORS.red,
-        color: COLORS.red,
+        fromColor: glyphColor ?? COLORS.red,
+        color: glyphColor ?? COLORS.red,
+        glyphFamily,
       });
       return;
     }
-    drawCompressedVerticalGlyph(context, "必殺", left + size / 2, top + size * 0.5, size * 0.74, 0.52, 1.02);
+    drawCompressedVerticalGlyph(context, "必殺", left + size / 2, top + size * 0.5, size * 0.74, 0.52, 1.02, glyphFamily);
     return;
   }
 
-  context.font = `400 ${Math.floor(size * 0.7)}px "Huiwen-Fangsong", "STFangsong", "Songti TC", serif`;
+  context.font = `400 ${Math.floor(size * 0.7)}px ${glyphFamily}`;
   if (block.label.length > 1) {
-    drawCompressedVerticalGlyph(context, block.label, left + size / 2, top + size * 0.5, size * 0.68, 0.5, 1);
+    drawCompressedVerticalGlyph(context, block.label, left + size / 2, top + size * 0.5, size * 0.68, 0.5, 1, glyphFamily);
     return;
   }
   context.fillText(block.label, left + size / 2, top + size * getGlyphCenterY(block));
 }
 
-function drawVerticalGlyph(context, text, x, y, fontSize, lineGap = 0) {
-  context.font = `400 ${Math.floor(fontSize)}px "Huiwen-Fangsong", "STFangsong", "Songti TC", serif`;
+function drawVerticalGlyph(context, text, x, y, fontSize, lineGap = 0, glyphFamily = `"Huiwen-Fangsong", "STFangsong", "Songti TC", serif`) {
+  context.font = `400 ${Math.floor(fontSize)}px ${glyphFamily}`;
   Array.from(text).forEach((char, index) => {
     context.fillText(char, x, y + index * (fontSize + lineGap));
   });
 }
 
-function drawCompressedVerticalGlyph(context, text, x, y, fontSize, yScale, lineAdvance = 0.92) {
+function drawCompressedVerticalGlyph(context, text, x, y, fontSize, yScale, lineAdvance = 0.92, glyphFamily = `"Huiwen-Fangsong", "STFangsong", "Songti TC", serif`) {
   const chars = Array.from(text);
   const advance = fontSize * lineAdvance;
   const startY = -((chars.length - 1) * advance) / 2;
@@ -287,11 +314,11 @@ function drawCompressedVerticalGlyph(context, text, x, y, fontSize, yScale, line
   context.save();
   context.translate(x, y);
   context.scale(1, yScale);
-  drawVerticalGlyph(context, text, 0, startY, fontSize, fontSize * (lineAdvance - 1));
+  drawVerticalGlyph(context, text, 0, startY, fontSize, fontSize * (lineAdvance - 1), glyphFamily);
   context.restore();
 }
 
-function drawGlyphMorph(context, { from, to, x, y, size, progress, fromColor = COLORS.glyph, color }) {
+function drawGlyphMorph(context, { from, to, x, y, size, progress, fromColor = COLORS.glyph, color, glyphFamily = `"Huiwen-Fangsong", "STFangsong", "Songti TC", serif` }) {
   const fromAlpha = Math.max(0, 1 - progress * 1.75);
   const toAlpha = Math.min(1, Math.max(0, (progress - 0.22) / 0.58));
   const fromScaleY = Math.max(0.18, 1 - progress * 0.82);
@@ -301,7 +328,7 @@ function drawGlyphMorph(context, { from, to, x, y, size, progress, fromColor = C
   context.save();
   context.globalAlpha *= fromAlpha;
   context.fillStyle = fromColor;
-  context.font = `400 ${Math.floor(size * 0.7)}px "Huiwen-Fangsong", "STFangsong", "Songti TC", serif`;
+  context.font = `400 ${Math.floor(size * 0.7)}px ${glyphFamily}`;
   context.textAlign = "center";
   context.textBaseline = "middle";
   context.translate(x, y);
@@ -315,9 +342,9 @@ function drawGlyphMorph(context, { from, to, x, y, size, progress, fromColor = C
   context.textAlign = "center";
   context.textBaseline = "middle";
   if (to.length > 1) {
-    drawCompressedVerticalGlyph(context, to, x, y, size * 0.74, toScaleY, 1.02);
+    drawCompressedVerticalGlyph(context, to, x, y, size * 0.74, toScaleY, 1.02, glyphFamily);
   } else {
-    context.font = `400 ${Math.floor(size * 0.7)}px "Huiwen-Fangsong", "STFangsong", "Songti TC", serif`;
+    context.font = `400 ${Math.floor(size * 0.7)}px ${glyphFamily}`;
     context.translate(x, y);
     context.scale(1, toScaleY);
     context.fillText(to, 0, 0);

@@ -7,7 +7,7 @@ import {
   MONSTER_FALL_STEP_ANIMATION_MS,
   NORMAL_COLUMNS,
   UPCOMING_BLOCK_PREVIEW_COUNT,
-} from "./core/config.js?v=20260824-3";
+} from "./core/config.js?v=20260831-2";
 import {
   canMonstersDrop,
   canMove,
@@ -22,12 +22,15 @@ import {
   togglePause,
   updateBoardAnimations,
   updateEncounter,
-} from "./core/game.js?v=20260825-5";
-import { createCanvasRenderer } from "./renderers/canvasRenderer.js?v=20260827-5";
+} from "./core/game.js?v=20260831-7";
+import { createCanvasRenderer } from "./renderers/canvasRenderer.js?v=20260831-6";
 import { COLORS } from "./theme/colors.js?v=20260825-23";
-import { bindInput, bindSwipeInput } from "./ui/input.js?v=20260825-2";
+import { bindInput, bindSwipeInput } from "./ui/input.js?v=20260831-6";
 import { toChineseNumber } from "./ui/chineseNumbers.js?v=20260821-1";
 import { updateUiEffects } from "./core/uiEffects.js?v=20260824-1";
+import { loadBlessings } from "./core/blessings.js?v=20260831-5";
+
+await loadBlessings();
 
 const uiEffects = document.querySelector("#ui-effects");
 const cover = document.querySelector("#cover");
@@ -58,9 +61,15 @@ let runReadyAt = 0;
 let pauseVisual = 0;
 let endingVisual = 0;
 let wasPaused = false;
+let dismissingCover = false;
 const rollingStats = {
   treasure: createRollingStat(),
 };
+const fontsLoaded = Promise.all([
+  document.fonts.load(`400 110px "YDW aosagi"`, "随手無常記"),
+  document.fonts.load(`400 36px "Huiwen-Fangsong"`, "體寶折戟沉沙克敵制勝"),
+  document.fonts.load(`400 36px "Zhaohua"`, "按兵不動"),
+]).catch(() => {}).finally(() => document.body.classList.remove("fonts-loading"));
 
 bindInput(
   () => (uiTime >= runReadyAt ? game : null),
@@ -219,7 +228,7 @@ function renderBodyDots(maxBody, currentBody, guard = 0) {
 
 function renderBlessings() {
   const tags = [
-    ...getBlessingStacks(game.player.blessings).map(({ label, count }) => (count > 1 ? `${label}${toChineseNumber(count)}` : label)),
+    ...getBlessingStacks(game.player.blessings).map(({ label, count }) => (count > 1 ? `${label} ${toChineseNumber(count)}` : label)),
   ];
 
   const curseTag = getCurseTag(game.player.pendingCurses);
@@ -554,6 +563,7 @@ function handlePauseControl() {
 
 function startRun(readyDelay = 0) {
   document.body.classList.remove("is-cover-exiting");
+  dismissingCover = false;
   game = createGame();
   runReadyAt = performance.now() + readyDelay;
   dropCounter = 0;
@@ -566,11 +576,13 @@ function startRun(readyDelay = 0) {
   render();
 }
 
-function dismissCover(event) {
-  if (game || !document.body.classList.contains("is-idle") || document.body.classList.contains("is-cover-exiting")) return;
+async function dismissCover(event) {
+  if (game || dismissingCover || !document.body.classList.contains("is-idle") || document.body.classList.contains("is-cover-exiting")) return;
   if (event.type === "keydown" && (event.metaKey || event.ctrlKey || event.altKey)) return;
 
   event.preventDefault();
+  dismissingCover = true;
+  await fontsLoaded;
   document.body.classList.add("is-cover-exiting");
   setTimeout(() => startRun(1300), 900);
 }

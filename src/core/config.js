@@ -113,7 +113,6 @@ export const MONSTER_COUNT_PERCENTAGES = {
 // Percentage chance for each normal block type; values should add up to 100.
 export const NORMAL_BLOCK_PERCENTAGES = {
   B: 12,
-  D: 0,
   L: 44,
   C: 9,
   T: 13,
@@ -190,9 +189,6 @@ export const HEAL_BLOCK_BODY_GAIN = 1;
 // Pending Curse charges gained when 呪 resolves.
 export const CURSE_BLOCK_PENDING_GAIN = 1;
 
-// Deprecated: Sword skill gained when 劍 resolves if the retained block is manually spawned.
-export const SWORD_BLOCK_SKILL_GAIN = 1;
-
 // Value added to the next monster that receives a pending Curse.
 export const CURSED_MONSTER_VALUE_BONUS = 1;
 
@@ -228,9 +224,6 @@ export const SLASH_LOOT_ENABLED = false;
 // Base chance that 奪 triggers when a monster is slain.
 export const LOOT_CHANCE = 0.1;
 
-// Additional 奪 chance gained from each 斬奪 blessing.
-export const LOOT_CHANCE_BLESSING_BONUS = 0.1;
-
 // Maximum total 奪 trigger chance after blessings.
 export const MAX_LOOT_CHANCE = 1;
 
@@ -243,20 +236,8 @@ export const LOOT_TREASURE_GAIN = 1;
 // Body gained when 奪 grants healing.
 export const LOOT_BODY_GAIN = 1;
 
-// Bounded Slash bonus gained when buying 磨鋒.
-export const SHARPEN_SWORD_SKILL_GAIN = 1;
-
 // Maximum Slash bonus from Sword blessings.
 export const MAX_SWORD_SKILL = 2;
-
-// 根骨 gained when buying 鍊體.
-export const TEMPER_BODY_MAX_BODY_GAIN = 2;
-
-// 體魄 gained when buying 鍊體.
-export const TEMPER_BODY_BODY_GAIN = 2;
-
-// Extra 甲 value gained from 重甲.
-export const HEAVY_ARMOR_BLOCK_BONUS = 1;
 
 // Extra damage per 斬 when 連斬 sees more than one 斬 in an encounter.
 export const CHAIN_SLASH_DAMAGE_PER_SLASH = 1;

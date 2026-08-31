@@ -10,7 +10,8 @@ import {
   NORMAL_BLOCK_PERCENTAGES,
   RUN_LENGTH,
   UPCOMING_BLOCK_PREVIEW_COUNT,
-} from "./config.js?v=20260825-1";
+} from "./config.js?v=20260831-2";
+import { getNormalBlockWeightMultiplier } from "./blessings.js?v=20260831-5";
 
 export function createRun(roundCount = RUN_LENGTH) {
   return {
@@ -20,17 +21,17 @@ export function createRun(roundCount = RUN_LENGTH) {
   };
 }
 
-export function getNextRound(run, difficultyPhase = 1) {
+export function getNextRound(run, difficultyPhase = 1, player = null) {
   if (run.currentRound >= run.totalRounds) return null;
-  ensureGeneratedRounds(run, run.currentRound + 1, difficultyPhase);
+  ensureGeneratedRounds(run, run.currentRound + 1, difficultyPhase, player);
 
   const round = run.rounds[run.currentRound];
   run.currentRound += 1;
   return round;
 }
 
-export function peekUpcomingBlocks(run, count = UPCOMING_BLOCK_PREVIEW_COUNT, difficultyPhase = 1) {
-  ensureGeneratedRounds(run, run.currentRound + Math.ceil(count / NORMAL_BLOCKS_PER_ROUND), difficultyPhase);
+export function peekUpcomingBlocks(run, count = UPCOMING_BLOCK_PREVIEW_COUNT, difficultyPhase = 1, player = null) {
+  ensureGeneratedRounds(run, run.currentRound + Math.ceil(count / NORMAL_BLOCKS_PER_ROUND), difficultyPhase, player);
   return run.rounds.slice(run.currentRound).flat().slice(0, count);
 }
 
@@ -38,25 +39,35 @@ export function getDifficultyPhase(completedEncounters = 0) {
   return ENCOUNTER_PHASES.find((phase) => completedEncounters >= phase.minEncounter && completedEncounters <= phase.maxEncounter)?.phase ?? 1;
 }
 
-function ensureGeneratedRounds(run, desiredCount, difficultyPhase) {
+export function getEffectiveNormalBlockPercentages(player = null) {
+  if (!player?.blessingIds?.length) return { ...NORMAL_BLOCK_PERCENTAGES };
+
+  const weights = NORMAL_BLOCK_KEYS.reduce((table, type) => {
+    table[type] = Math.max(0, NORMAL_BLOCK_PERCENTAGES[type] ?? 0) * getNormalBlockWeightMultiplier(player ?? { blessingIds: [] }, type);
+    return table;
+  }, {});
+  return normalizePercentages(weights);
+}
+
+function ensureGeneratedRounds(run, desiredCount, difficultyPhase, player) {
   const targetCount = Math.min(run.totalRounds, desiredCount);
   while (run.rounds.length < targetCount) {
-    run.rounds.push(createRound(difficultyPhase));
+    run.rounds.push(createRound(difficultyPhase, player));
   }
 }
 
-function createRound(difficultyPhase) {
+function createRound(difficultyPhase, player) {
   const monsterCountPercentages = getMonsterCountPercentages(difficultyPhase);
   const monsterCount = Number(pickPercentageType(Object.keys(MONSTER_COUNT_CURVE_BASE), monsterCountPercentages));
 
   return [
-    ...Array.from({ length: NORMAL_BLOCKS_PER_ROUND }, createNormalBlockTemplate),
+    ...Array.from({ length: NORMAL_BLOCKS_PER_ROUND }, () => createNormalBlockTemplate(player)),
     ...Array.from({ length: monsterCount }, () => createMonsterBlockTemplate(difficultyPhase)),
   ];
 }
 
-function createNormalBlockTemplate() {
-  const type = pickPercentageType(NORMAL_BLOCK_KEYS, NORMAL_BLOCK_PERCENTAGES);
+function createNormalBlockTemplate(player) {
+  const type = pickPercentageType(NORMAL_BLOCK_KEYS, getEffectiveNormalBlockPercentages(player));
 
   return {
     ...BLOCK_TYPES[type],
@@ -122,4 +133,13 @@ function pickPercentageType(types, percentages) {
   }
 
   return types[types.length - 1];
+}
+
+function normalizePercentages(weights) {
+  const total = Object.values(weights).reduce((sum, weight) => sum + weight, 0);
+  if (!Number.isFinite(total) || total <= 0) throw new Error("At least one normal block weight must be positive.");
+
+  return Object.fromEntries(
+    Object.entries(weights).map(([type, weight]) => [type, (weight / total) * 100]),
+  );
 }

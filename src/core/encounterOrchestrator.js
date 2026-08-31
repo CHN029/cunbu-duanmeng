@@ -15,25 +15,23 @@ import {
   HEAL_BLOCK_BODY_GAIN,
   LOOT_BODY_GAIN,
   LOOT_CHANCE,
-  LOOT_CHANCE_BLESSING_BONUS,
   LOOT_EFFECT_DELAY_MS,
   LOOT_TREASURE_CHANCE,
   LOOT_TREASURE_GAIN,
   MAX_GUARD,
   MAX_LOOT_CHANCE,
-  MAX_SWORD_SKILL,
   MONSTER_HIT_SHAKE_MS,
   MONSTER_START_X,
   NORMAL_COLUMNS,
   SLASH_LOOT_ENABLED,
   SLASH_BEAM_EFFECT_MS,
   SLASH_DAMAGE_REVEAL_DELAY_MS,
-  SWORD_BLOCK_SKILL_GAIN,
   TREASURE_BLOCK_GAIN,
   UI_EFFECT_MS,
   UI_EFFECT_STAGGER_MS,
-} from "./config.js?v=20260824-3";
-import { getSlashDamage } from "./combatRules.js?v=20260824-1";
+} from "./config.js?v=20260831-2";
+import { getStackedBlessingEffectTotal } from "./blessings.js?v=20260831-5";
+import { getSlashDamage } from "./combatRules.js?v=20260831-5";
 import { addEffect, updateEffects } from "./effects.js?v=20260824-1";
 import { addUiEffect } from "./uiEffects.js?v=20260824-1";
 import { COLORS } from "../theme/colors.js?v=20260825-23";
@@ -195,10 +193,6 @@ function applyNormalBlock(game, event, delay = 0) {
     wait = ENCOUNTER_UI_EFFECT_WAIT_MS + delay;
   }
 
-  if (block.type === "D") {
-    game.player.swordSkill = Math.min(MAX_SWORD_SKILL, game.player.swordSkill + SWORD_BLOCK_SKILL_GAIN);
-  }
-
   if (block.type === "L") {
     wait = damageFrontMonsters(game, getSlashDamage(game), event);
   }
@@ -342,8 +336,7 @@ function tryLootSlainMonster(game, target) {
 }
 
 function getLootChance(game) {
-  const blessingCount = game.player.blessingIds.filter((id) => id === "lootCraft").length;
-  return Math.min(MAX_LOOT_CHANCE, LOOT_CHANCE + blessingCount * LOOT_CHANCE_BLESSING_BONUS);
+  return Math.min(MAX_LOOT_CHANCE, LOOT_CHANCE + getStackedBlessingEffectTotal(game.player, "increaseLootChance"));
 }
 
 function findFrontEncounterMonster(game) {
@@ -439,8 +432,9 @@ function resolveSlainCursedMonsterReward(game, delay = 0) {
   const target = findSlainCursedEncounterMonster(game);
   if (!target) return false;
 
-  game.player.treasure += CURSED_MONSTER_TREASURE_GAIN;
-  for (let index = 0; index < CURSED_MONSTER_TREASURE_GAIN; index += 1) {
+  const treasureGain = getCursedMonsterTreasureGain(game);
+  game.player.treasure += treasureGain;
+  for (let index = 0; index < treasureGain; index += 1) {
     addUiEffect(game, {
       type: "travel",
       label: "寶",
@@ -454,6 +448,10 @@ function resolveSlainCursedMonsterReward(game, delay = 0) {
     });
   }
   return true;
+}
+
+function getCursedMonsterTreasureGain(game) {
+  return CURSED_MONSTER_TREASURE_GAIN + getStackedBlessingEffectTotal(game.player, "increaseCursedMonsterTreasure");
 }
 
 function getOrdinarySlashDamage(game, slashEvents) {

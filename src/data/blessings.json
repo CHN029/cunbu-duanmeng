@@ -1,0 +1,140 @@
+[
+  {
+    "id": "renewal",
+    "label": "回春",
+    "description": "體魄復滿",
+    "path": "general",
+    "category": "instant",
+    "effects": [
+      { "type": "restoreBody" }
+    ]
+  },
+  {
+    "id": "sharpen",
+    "label": "磨鋒",
+    "description": "斬傷加一",
+    "path": "swordsman",
+    "category": "instant",
+    "effects": [
+      { "type": "increaseSwordSkill", "amount": 1 }
+    ]
+  },
+  {
+    "id": "chainSlash",
+    "label": "連斬",
+    "description": "多斬增傷",
+    "path": "swordsman",
+    "category": "modifier",
+    "effects": [
+      { "type": "enableChainSlash" }
+    ]
+  },
+  {
+    "id": "temperBody",
+    "label": "鍊體",
+    "description": "根骨體魄加二",
+    "path": "ironBody",
+    "category": "instant",
+    "effects": [
+      { "type": "increaseMaxBody", "amount": 2 },
+      { "type": "healBody", "amount": 2 }
+    ]
+  },
+  {
+    "id": "heavyArmor",
+    "label": "重甲",
+    "description": "甲值加一",
+    "path": "ironBody",
+    "category": "modifier",
+    "effects": [
+      { "type": "increaseArmorValueBonus", "amount": 1 }
+    ]
+  },
+  {
+    "id": "lootCraft",
+    "label": "斬奪",
+    "description": "奪率加百分之十",
+    "path": "general",
+    "category": "modifier",
+    "effects": [
+      { "type": "increaseLootChance", "amount": 0.1 }
+    ]
+  },
+  {
+    "id": "arsenal",
+    "label": "兵庫",
+    "description": "斬較易出現",
+    "path": "general",
+    "category": "modifier",
+    "maxStacks": 1,
+    "effects": [
+      { "type": "multiplyNormalBlockWeight", "blockType": "L", "multiplier": 1.25 }
+    ]
+  },
+  {
+    "id": "armoury",
+    "label": "甲庫",
+    "description": "甲較易出現",
+    "path": "ironBody",
+    "category": "modifier",
+    "maxStacks": 1,
+    "effects": [
+      { "type": "multiplyNormalBlockWeight", "blockType": "E", "multiplier": 1.5 }
+    ]
+  },
+  {
+    "id": "herbGarden",
+    "label": "藥圃",
+    "description": "藥較易出現",
+    "path": "general",
+    "category": "modifier",
+    "maxStacks": 1,
+    "effects": [
+      { "type": "multiplyNormalBlockWeight", "blockType": "B", "multiplier": 1.5 }
+    ]
+  },
+  {
+    "id": "fortune",
+    "label": "招財",
+    "description": "寶較易出現",
+    "path": "general",
+    "category": "modifier",
+    "maxStacks": 1,
+    "effects": [
+      { "type": "multiplyNormalBlockWeight", "blockType": "T", "multiplier": 1.5 }
+    ]
+  },
+  {
+    "id": "summonCalamity",
+    "label": "招煞",
+    "description": "呪較易出現",
+    "path": "general",
+    "category": "modifier",
+    "maxStacks": 1,
+    "effects": [
+      { "type": "multiplyNormalBlockWeight", "blockType": "C", "multiplier": 1.75 }
+    ]
+  },
+  {
+    "id": "seekOpenings",
+    "label": "洞機",
+    "description": "機較易出現",
+    "path": "swordsman",
+    "category": "modifier",
+    "maxStacks": 1,
+    "effects": [
+      { "type": "multiplyNormalBlockWeight", "blockType": "O", "multiplier": 1.75 }
+    ]
+  },
+  {
+    "id": "bounty",
+    "label": "懸賞",
+    "description": "斬鬼多得一寶",
+    "path": "general",
+    "category": "modifier",
+    "maxStacks": 1,
+    "effects": [
+      { "type": "increaseCursedMonsterTreasure", "amount": 1 }
+    ]
+  }
+]

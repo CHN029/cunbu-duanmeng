@@ -58,7 +58,6 @@ Normal block rates remain constant:
 | `寶` | 13% |
 | `機` | 8% |
 | `甲` | 14% |
-| `劍` | 0% |
 
 Rounds are generated only as needed for play and preview. A block already visible in the preview is
 not regenerated when its round begins. The design intent and tuning knobs are documented in
@@ -153,11 +152,6 @@ The side tag shows `呪` for one charge and `呪` plus a Chinese count for multi
 
 Adds 1 `財寶`.
 
-### `劍` — Legacy Sword block
-
-The type still exists and would add 1 bounded `劍法`, but its generation rate is zero. Current Sword
-progression comes from the merchant.
-
 ## Monsters
 
 A monster's current value is both its health and its attack damage. Phase bonuses are added when the
@@ -175,7 +169,7 @@ does not attack.
 
 The bottom row is briefly highlighted before resolution. Events then resolve in three groups:
 
-1. support blocks: `藥`, `劍`, `呪`, `寶`, `機`, and `甲`
+1. support blocks: `藥`, `呪`, `寶`, `機`, and `甲`
 2. all `斬` blocks
 3. bottom-row monsters
 
@@ -190,7 +184,9 @@ sequence, slain monsters exit and the remaining board collapses.
 ## Merchant And Blessings
 
 The merchant opens between rounds when `財寶` is at least 10. Existing board content is preserved.
-Each visit offers three random entries from the full blessing pool plus a skip option.
+Each visit offers up to three random eligible entries from the full blessing pool plus a skip
+option. Blessing labels, descriptions, categories, stack caps, and simple effect values are authored
+in `src/data/blessings.json`.
 
 Buying a blessing currently spends all treasure. Skipping costs 5 treasure. The run resumes after
 either choice.
@@ -203,9 +199,19 @@ either choice.
 | `鍊體` | instant | `根骨 +2` and `體魄 +2`, respecting the new maximum |
 | `重甲` | lasting | Every future `甲` gains +1 Guard value |
 | `斬奪` | lasting | Adds 10% to the `奪` chance if `奪` is enabled |
+| `兵庫` | lasting, unique | Future `斬` drop weight ×1.25 |
+| `甲庫` | lasting, unique | Future `甲` drop weight ×1.5 |
+| `藥圃` | lasting, unique | Future `藥` drop weight ×1.5 |
+| `招財` | lasting, unique | Future `寶` drop weight ×1.5 |
+| `招煞` | lasting, unique | Future `呪` drop weight ×1.75 |
+| `洞機` | lasting, unique | Future `機` drop weight ×1.75 |
+| `懸賞` | lasting, unique | Slaying a Cursed Monster grants 1 extra `財寶` |
 
 Lasting blessings appear in the side panel and repeated copies are shown as a stack count. Instant
 blessings apply immediately and do not appear there.
+
+Drop-weight blessings modify only future rounds that have not been generated yet. Blocks already
+visible in the six-block preview remain fixed after a purchase.
 
 `奪` is currently disabled by configuration. Therefore `斬奪` can appear and be bought but has no
 combat effect in the current build. If re-enabled, each slain monster starts with a 10% `奪` chance,
@@ -267,5 +273,3 @@ Merchant:
 
 - Generation curves, treasure pace, and blessing strength still need full-run balancing.
 - `奪` and therefore the practical value of `斬奪` are disabled.
-- The retained merchant preview path and legacy Sword block exist for development but are hidden from
-  normal play.

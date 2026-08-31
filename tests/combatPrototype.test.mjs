@@ -12,6 +12,9 @@ import {
 } from "../src/core/config.js";
 import { startEncounter, updateEncounter } from "../src/core/encounterOrchestrator.js";
 import { chooseMerchantOption } from "../src/core/game.js";
+import { getEligibleBlessingOptions } from "../src/core/blessings.js";
+import { createMerchant } from "../src/core/merchant.js";
+import { createRun, getEffectiveNormalBlockPercentages, getNextRound, peekUpcomingBlocks } from "../src/core/runOrchestrator.js";
 import { updateUiEffects } from "../src/core/uiEffects.js";
 
 function block(type) {
@@ -83,10 +86,79 @@ function bottom(game, x) {
   return game.board[game.height - 1][x];
 }
 
-assert.equal(NORMAL_BLOCK_PERCENTAGES.D, 0, "Sword block should not appear in normal generation.");
+assert.equal(BLOCK_TYPES.D, undefined, "Sword block should not exist in the block catalogue.");
+assert.equal(NORMAL_BLOCK_PERCENTAGES.D, undefined, "Sword block should not appear in normal generation.");
 assert.equal(Object.values(NORMAL_BLOCK_PERCENTAGES).reduce((sum, value) => sum + value, 0), 100, "Normal block percentages should add up to 100.");
 assert.equal(Object.values(MONSTER_BLOCK_PERCENTAGES).reduce((sum, value) => sum + value, 0), 100, "Monster block percentages should add up to 100.");
 assert.equal(Object.values(MONSTER_COUNT_PERCENTAGES).reduce((sum, value) => sum + value, 0), 100, "Monster-count percentages should add up to 100.");
+
+{
+  const player = { blessingIds: [] };
+  const effective = getEffectiveNormalBlockPercentages(player);
+  assert.deepEqual(effective, NORMAL_BLOCK_PERCENTAGES, "No drop blessing should preserve base normal-block rates.");
+}
+
+{
+  const dropBlessings = [
+    ["arsenal", "L"],
+    ["armoury", "E"],
+    ["herbGarden", "B"],
+    ["fortune", "T"],
+    ["summonCalamity", "C"],
+    ["seekOpenings", "O"],
+  ];
+
+  dropBlessings.forEach(([id, type]) => {
+    const effective = getEffectiveNormalBlockPercentages({ blessingIds: [id] });
+    const total = Object.values(effective).reduce((sum, value) => sum + value, 0);
+    assert.equal(Math.round(total * 1000) / 1000, 100, `${id} effective rates should add up to 100.`);
+    assert.ok(effective[type] > NORMAL_BLOCK_PERCENTAGES[type], `${id} should increase ${type}'s effective rate.`);
+  });
+}
+
+{
+  const firstOrder = getEffectiveNormalBlockPercentages({ blessingIds: ["arsenal", "fortune"] });
+  const secondOrder = getEffectiveNormalBlockPercentages({ blessingIds: ["fortune", "arsenal"] });
+  assert.deepEqual(firstOrder, secondOrder, "Different drop blessings should combine independently of purchase order.");
+}
+
+{
+  const player = { blessingIds: [] };
+  const run = createRun(4);
+  const preview = peekUpcomingBlocks(run, 6, 1, player);
+  player.blessingIds.push("arsenal");
+  const afterPurchasePreview = peekUpcomingBlocks(run, 6, 1, player);
+  assert.deepEqual(afterPurchasePreview, preview, "Already previewed blocks should remain fixed after buying a drop blessing.");
+}
+
+{
+  const player = { blessingIds: ["arsenal"] };
+  const run = createRun(1);
+  const originalRandom = Math.random;
+  Math.random = () => 0.58;
+  try {
+    const round = getNextRound(run, 1, player);
+    assert.equal(round[0].type, "L", "Newly generated rounds should use updated drop-blessing weights.");
+  } finally {
+    Math.random = originalRandom;
+  }
+}
+
+{
+  const newBlessings = ["arsenal", "armoury", "herbGarden", "fortune", "summonCalamity", "seekOpenings", "bounty"];
+  const unownedIds = getEligibleBlessingOptions({ blessingIds: [] }).map((blessing) => blessing.id);
+  newBlessings.forEach((id) => assert.ok(unownedIds.includes(id), `${id} should be eligible before it is owned.`));
+
+  const ownedIds = getEligibleBlessingOptions({ blessingIds: newBlessings }).map((blessing) => blessing.id);
+  newBlessings.forEach((id) => assert.equal(ownedIds.includes(id), false, `${id} should be ineligible after it is owned.`));
+}
+
+{
+  const merchant = createMerchant({ blessingIds: [] }, false, true);
+  const optionIds = merchant.options.map((option) => option.id);
+  assert.equal(new Set(optionIds).size, optionIds.length, "Merchant offers should not contain duplicate blessing ids.");
+  assert.ok(optionIds.length <= 3, "Merchant should show no more than three blessing options.");
+}
 
 {
   const board = createBoard();
@@ -213,6 +285,16 @@ assert.equal(Object.values(MONSTER_COUNT_PERCENTAGES).reduce((sum, value) => sum
   assert.equal(bottom(game, 4).slayed, true, "Ordinary Slash damage should slay a cursed tier-1 monster.");
   assert.equal(game.player.treasure, CURSED_MONSTER_TREASURE_GAIN, "Slaying a Cursed Monster should grant exactly two treasure.");
   assert.equal(game.player.pendingCurses, 0, "The consumed Curse should not return after the bounty resolves.");
+}
+
+{
+  const game = makeGame();
+  game.player.pendingCurses = 1;
+  game.player.blessingIds.push("bounty");
+  setBottomRow(game, ["L", "L", "B", "B"], ["R"]);
+  resolveEncounter(game);
+  assert.equal(game.player.treasure, CURSED_MONSTER_TREASURE_GAIN + 1, "懸賞 should add one treasure to a successful Cursed Monster bounty.");
+  assert.equal(game.uiEffects.filter((effect) => effect.deferPanelStat === "treasure" && effect.amount === 1).length, CURSED_MONSTER_TREASURE_GAIN + 1, "懸賞 bounty should create matching treasure UI increments.");
 }
 
 {

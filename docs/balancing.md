@@ -153,7 +153,7 @@ Increase it to delay value scaling. Decrease it to make values rise earlier.
 
 ## Resource Drops
 
-Resource drops are currently fixed across all phases.
+Resource drops start from a fixed base table across all phases.
 
 | Block | Rate | Role |
 | --- | ---: | --- |
@@ -163,11 +163,25 @@ Resource drops are currently fixed across all phases.
 | `寶` | 13% | shop progress |
 | `機` | 8% | converts one `斬` into `必殺` |
 | `甲` | 14% | persistent Guard |
-| `劍` | 0% | legacy block, no random drops |
 
 The reason resources do not currently scale by formula is readability. If the monster curve alone
 is too harsh, the next likely adjustment is a small authored table for resource rates by phase,
 instead of one global resource formula.
+
+Shop blessings can reshape future normal-block weights. Each owned drop blessing multiplies its
+target block's base weight, then the full normal-block table is normalized back to 100:
+
+| Blessing | Target | Multiplier |
+| --- | --- | ---: |
+| `兵庫` | `斬` | 1.25 |
+| `甲庫` | `甲` | 1.5 |
+| `藥圃` | `藥` | 1.5 |
+| `招財` | `寶` | 1.5 |
+| `招煞` | `呪` | 1.75 |
+| `洞機` | `機` | 1.75 |
+
+These modifiers affect only future unpreviewed rounds. They do not change monster count, monster
+tier, monster value, or already visible preview blocks.
 
 ## Blessings As The Gap Closer
 
@@ -178,6 +192,13 @@ blessings:
 - `呪` can produce extra treasure by making a later monster more dangerous
 - lasting blessings make repeated decisions matter
 - instant blessings patch survival or power at purchase time
+
+Blessing labels, descriptions, categories, and simple effect values live in
+`src/data/blessings.json`. `src/core/blessings.js` interprets those effects. Prefer changing the
+JSON first; add code only when a new blessing needs a new effect type.
+
+`懸賞` adds 1 treasure to a successful Cursed Monster bounty, changing the reward from 2 to 3. It
+does not reward ordinary monster kills or Cursed Monsters that survive to attack.
 
 The useful tuning question is:
 
