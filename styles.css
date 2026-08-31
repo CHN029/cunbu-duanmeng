@@ -20,6 +20,14 @@
   font-display: block;
 }
 
+@font-face {
+  font-family: "Lishu";
+  src: url("./assets/fonts/lishu.ttf") format("truetype");
+  font-style: normal;
+  font-weight: 400;
+  font-display: block;
+}
+
 :root {
   color-scheme: light;
   --paper: #f5f2e9;
@@ -102,6 +110,18 @@ body {
   text-align: center;
   opacity: 1;
   transition: opacity 240ms ease;
+}
+
+.cover-font-preload {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  opacity: 0;
+  pointer-events: none;
+  white-space: nowrap;
+  font-family: "Lishu", "Huiwen-Fangsong", "STFangsong", "Songti TC", serif;
+  font-size: 32px;
 }
 
 .fonts-loading .cover-title {
@@ -436,13 +456,20 @@ body.is-paused .side-panel {
   border: 1px solid var(--red-heart);
   border-radius: 3px;
   background: var(--red-heart);
-  padding: 3px 1px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 5px 0;
   color: var(--paper);
-  font-size: 0.92rem;
-  line-height: 1.2;
+  font-family: "Lishu", "Huiwen-Fangsong", "STFangsong", "Songti TC", serif;
+  font-size: 1.12rem;
+  font-weight: 300;
+  line-height: 1.08;
   text-align: center;
   writing-mode: vertical-rl;
   text-orientation: upright;
+  transform: scale(1.08, 0.9);
+  transform-origin: center top;
 }
 
 .blessing-tag.curse-tag {
@@ -685,8 +712,8 @@ button:focus-visible {
   }
 
   .blessing-tag {
-    padding: 2px 1px;
-    font-size: 0.98rem;
+    padding: 5px 0;
+    font-size: 1.16rem;
   }
 
   .round-actions {

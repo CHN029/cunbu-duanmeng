@@ -206,12 +206,17 @@ either choice.
 | `招煞` | lasting, unique | Future `呪` drop weight ×1.75 |
 | `洞機` | lasting, unique | Future `機` drop weight ×1.75 |
 | `懸賞` | lasting, unique | Slaying a Cursed Monster grants 1 extra `財寶` |
+| `破邪` | lasting, unique | In a Cursed Monster encounter, each ordinary `斬` gains +1 damage |
 
 Lasting blessings appear in the side panel and repeated copies are shown as a stack count. Instant
 blessings apply immediately and do not appear there.
 
 Drop-weight blessings modify only future rounds that have not been generated yet. Blocks already
 visible in the six-block preview remain fixed after a purchase.
+
+`破邪` activates only when a queued Curse has already infected a monster at encounter start. A `呪`
+block in the current row does not empower that row's Slashes. The bonus affects ordinary Slashes
+only; `必殺` remains an instant kill without an added damage value.
 
 `奪` is currently disabled by configuration. Therefore `斬奪` can appear and be bought but has no
 combat effect in the current build. If re-enabled, each slain monster starts with a 10% `奪` chance,

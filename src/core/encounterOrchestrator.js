@@ -30,8 +30,8 @@ import {
   UI_EFFECT_MS,
   UI_EFFECT_STAGGER_MS,
 } from "./config.js?v=20260831-2";
-import { getStackedBlessingEffectTotal } from "./blessings.js?v=20260831-5";
-import { getSlashDamage } from "./combatRules.js?v=20260831-5";
+import { getStackedBlessingEffectTotal } from "./blessings.js?v=20260831-6";
+import { getSlashDamage } from "./combatRules.js?v=20260831-6";
 import { addEffect, updateEffects } from "./effects.js?v=20260824-1";
 import { addUiEffect } from "./uiEffects.js?v=20260824-1";
 import { COLORS } from "../theme/colors.js?v=20260825-23";
@@ -58,9 +58,11 @@ export function startEncounter(game) {
     introDuration: ENCOUNTER_INTRO_MS,
     slashCount: attackEvents.length,
     hasMonsters: monsterEvents.length > 0,
+    hasCursedMonster: false,
   };
 
   attachPendingCurseToFrontMonster(game);
+  game.encounter.hasCursedMonster = hasCursedEncounterMonster(game);
 }
 
 function createEncounterGroups(supportEvents, attackEvents, monsterEvents) {
@@ -476,6 +478,13 @@ function getMonsterEncounterEvents(game) {
     ...(game.encounter?.current?.events ?? []),
     ...(game.encounter?.queue ?? []).flatMap((group) => group.events),
   ].filter((event) => event?.type === "monster");
+}
+
+function hasCursedEncounterMonster(game) {
+  return getMonsterEncounterEvents(game).some((event) => {
+    const block = game.board[event.y]?.[event.x];
+    return block === event.block && block.cursedMonster;
+  });
 }
 
 function healPlayer(player, amount) {

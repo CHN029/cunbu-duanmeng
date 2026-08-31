@@ -5,6 +5,7 @@ import { BLOCK_TYPES } from "../src/core/blockTypes.js";
 import {
   CURSED_MONSTER_TREASURE_GAIN,
   CURSED_MONSTER_VALUE_BONUS,
+  MAX_MONSTER_VALUE_BONUS,
   MERCHANT_PURCHASE_COST,
   MONSTER_BLOCK_PERCENTAGES,
   MONSTER_COUNT_PERCENTAGES,
@@ -13,6 +14,7 @@ import {
 import { startEncounter, updateEncounter } from "../src/core/encounterOrchestrator.js";
 import { chooseMerchantOption } from "../src/core/game.js";
 import { getEligibleBlessingOptions } from "../src/core/blessings.js";
+import { getSlashDamage } from "../src/core/combatRules.js";
 import { createMerchant } from "../src/core/merchant.js";
 import { createRun, getEffectiveNormalBlockPercentages, getNextRound, peekUpcomingBlocks } from "../src/core/runOrchestrator.js";
 import { updateUiEffects } from "../src/core/uiEffects.js";
@@ -145,7 +147,21 @@ assert.equal(Object.values(MONSTER_COUNT_PERCENTAGES).reduce((sum, value) => sum
 }
 
 {
-  const newBlessings = ["arsenal", "armoury", "herbGarden", "fortune", "summonCalamity", "seekOpenings", "bounty"];
+  const run = createRun(1);
+  const rolls = [0.2, 0, 0, 0.99];
+  const originalRandom = Math.random;
+  Math.random = () => rolls.shift() ?? 0;
+  try {
+    const round = getNextRound(run, 4);
+    const monster = round.find(({ type }) => type === "G");
+    assert.equal(monster.value, BLOCK_TYPES.G.value + MAX_MONSTER_VALUE_BONUS, "Phase-four monster value bonus should stop at its configured cap.");
+  } finally {
+    Math.random = originalRandom;
+  }
+}
+
+{
+  const newBlessings = ["arsenal", "armoury", "herbGarden", "fortune", "summonCalamity", "seekOpenings", "bounty", "banishEvil"];
   const unownedIds = getEligibleBlessingOptions({ blessingIds: [] }).map((blessing) => blessing.id);
   newBlessings.forEach((id) => assert.ok(unownedIds.includes(id), `${id} should be eligible before it is owned.`));
 
@@ -254,6 +270,75 @@ assert.equal(Object.values(MONSTER_COUNT_PERCENTAGES).reduce((sum, value) => sum
   advanceEncounter(game);
   assert.equal(game.player.body, 4, "A surviving Cursed Monster should attack with its increased value.");
   assert.equal(game.player.treasure, 0, "Surviving a Cursed Monster should grant no bounty.");
+}
+
+{
+  const game = makeGame();
+  game.player.pendingCurses = 1;
+  setBottomRow(game, ["L", "B", "B", "B"], ["R"]);
+  startEncounter(game);
+  assert.equal(game.encounter.hasCursedMonster, true, "A queued Curse should mark the encounter as cursed after attachment.");
+  assert.equal(getSlashDamage(game, game.encounter, bottom(game, 0)), 1, "Without 破邪, Cursed Monster encounters should retain ordinary Slash damage.");
+}
+
+{
+  const game = makeGame();
+  game.player.pendingCurses = 1;
+  game.player.blessingIds.push("banishEvil");
+  setBottomRow(game, ["L", "B", "B", "B"], ["R"]);
+  startEncounter(game);
+  assert.equal(getSlashDamage(game, game.encounter, bottom(game, 0)), 2, "破邪 should add one damage to an ordinary Slash in a Cursed Monster encounter.");
+  advanceEncounter(game);
+  assert.equal(bottom(game, 4).slayed, true, "破邪 should let one ordinary Slash slay a cursed tier-1 monster.");
+}
+
+{
+  const game = makeGame();
+  game.player.pendingCurses = 1;
+  game.player.blessingIds.push("banishEvil");
+  setBottomRow(game, ["L", "L", "B", "B"], ["M", "R"]);
+  startEncounter(game);
+  advanceEncounter(game);
+  assert.equal(bottom(game, 4).slayed, true, "Two 破邪-boosted Slashes should pool four total damage into the cursed front monster.");
+  assert.equal(bottom(game, 5).slayed, true, "Excess 破邪-boosted Slash damage should bleed into the next monster.");
+}
+
+{
+  const game = makeGame();
+  game.player.blessingIds.push("banishEvil");
+  setBottomRow(game, ["L", "B", "B", "B"], ["R"]);
+  startEncounter(game);
+  assert.equal(game.encounter.hasCursedMonster, false, "破邪 should not activate in an ordinary monster encounter.");
+  assert.equal(getSlashDamage(game, game.encounter, bottom(game, 0)), 1, "破邪 should give no bonus without a Cursed Monster.");
+}
+
+{
+  const game = makeGame();
+  game.player.blessingIds.push("banishEvil");
+  setBottomRow(game, ["C", "L", "B", "B"], ["R"]);
+  startEncounter(game);
+  assert.equal(game.encounter.hasCursedMonster, false, "A Curse from the current row should not activate 破邪 in that row.");
+  assert.equal(getSlashDamage(game, game.encounter, bottom(game, 1)), 1, "Current-row Curse should not increase current-row Slash damage.");
+}
+
+{
+  const game = makeGame();
+  game.player.pendingCurses = 1;
+  game.player.blessingIds.push("banishEvil", "chainSlash");
+  game.player.swordSkill = 1;
+  setBottomRow(game, ["L", "L", "B", "B"], ["G"]);
+  startEncounter(game);
+  assert.equal(getSlashDamage(game, game.encounter, bottom(game, 0)), 4, "Sword, 連斬, and 破邪 Slash bonuses should add together.");
+}
+
+{
+  const game = makeGame();
+  game.player.pendingCurses = 1;
+  game.player.blessingIds.push("banishEvil");
+  setBottomRow(game, ["O", "L", "B", "B"], ["G"]);
+  bottom(game, 1).instantSlash = true;
+  startEncounter(game);
+  assert.equal(getSlashDamage(game, game.encounter, bottom(game, 1)), 1, "必殺 should not receive the 破邪 damage bonus.");
 }
 
 {

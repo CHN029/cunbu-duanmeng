@@ -3,7 +3,7 @@ import {
   MERCHANT_SKIP_COST,
   MERCHANT_THRESHOLD,
 } from "./config.js?v=20260831-2";
-import { getEligibleBlessingOptions, isModifierBlessing } from "./blessings.js?v=20260831-5";
+import { getEligibleBlessingOptions, isModifierBlessing } from "./blessings.js?v=20260831-6";
 
 export { isModifierBlessing };
 

@@ -4,12 +4,12 @@
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <title>随手無常記・式樣</title>
-    <link rel="stylesheet" href="./styles.css?v=20260831-4">
-    <link rel="stylesheet" href="./style-guide.css?v=20260831-10">
+    <link rel="stylesheet" href="./styles.css?v=20260831-5">
+    <link rel="stylesheet" href="./style-guide.css?v=20260831-22">
   </head>
   <body class="style-page fonts-loading">
     <main class="style-sheet">
-      <section>
+      <section class="style-section">
         <h1>棋子</h1>
         <div class="block-variants">
           <canvas id="block-specimens" class="style-block-canvas" aria-label="現行棋子式樣與轉化動畫"></canvas>
@@ -17,37 +17,30 @@
         </div>
       </section>
 
-      <section class="style-meta-row">
-        <div>
-          <h1>福澤印記</h1>
-          <div class="blessing-tags style-blessings" aria-label="福澤印記式樣">
-            <span class="blessing-tag">磨鋒</span>
-            <span class="blessing-tag">鍊體二</span>
-            <span class="blessing-tag">斬奪</span>
-            <span class="blessing-tag curse-tag">呪二</span>
-          </div>
+      <section class="style-section">
+        <h1>色譜</h1>
+        <div class="palette-grid" aria-label="色彩式樣">
+          <div class="palette-chip"><span class="palette-swatch paper"></span><span class="palette-name">紙</span></div>
+          <div class="palette-chip"><span class="palette-swatch ink"></span><span class="palette-name">墨</span></div>
+          <div class="palette-chip"><span class="palette-swatch muted"></span><span class="palette-name">淡墨</span></div>
+          <div class="palette-chip"><span class="palette-swatch ghost"></span><span class="palette-name">影</span></div>
+          <div class="palette-chip"><span class="palette-swatch slash"></span><span class="palette-name">斬</span></div>
+          <div class="palette-chip"><span class="palette-swatch heal"></span><span class="palette-name">藥</span></div>
+          <div class="palette-chip"><span class="palette-swatch curse"></span><span class="palette-name">呪</span></div>
+          <div class="palette-chip"><span class="palette-swatch treasure"></span><span class="palette-name">寶</span></div>
+          <div class="palette-chip"><span class="palette-swatch momentum"></span><span class="palette-name">機</span></div>
+          <div class="palette-chip"><span class="palette-swatch armor"></span><span class="palette-name">甲</span></div>
+          <div class="palette-chip"><span class="palette-swatch monster"></span><span class="palette-name">獸</span></div>
+          <div class="palette-chip"><span class="palette-swatch grid"></span><span class="palette-name">角</span></div>
         </div>
+      </section>
 
-        <div>
-          <h1>色譜</h1>
-          <div class="palette-grid" aria-label="色彩式樣">
-            <div class="palette-chip"><span class="palette-swatch paper"></span><span class="palette-name">紙</span></div>
-            <div class="palette-chip"><span class="palette-swatch ink"></span><span class="palette-name">墨</span></div>
-            <div class="palette-chip"><span class="palette-swatch muted"></span><span class="palette-name">淡墨</span></div>
-            <div class="palette-chip"><span class="palette-swatch ghost"></span><span class="palette-name">影</span></div>
-            <div class="palette-chip"><span class="palette-swatch slash"></span><span class="palette-name">斬</span></div>
-            <div class="palette-chip"><span class="palette-swatch heal"></span><span class="palette-name">藥</span></div>
-            <div class="palette-chip"><span class="palette-swatch curse"></span><span class="palette-name">呪</span></div>
-            <div class="palette-chip"><span class="palette-swatch treasure"></span><span class="palette-name">寶</span></div>
-            <div class="palette-chip"><span class="palette-swatch momentum"></span><span class="palette-name">機</span></div>
-            <div class="palette-chip"><span class="palette-swatch armor"></span><span class="palette-name">甲</span></div>
-            <div class="palette-chip"><span class="palette-swatch monster"></span><span class="palette-name">獸</span></div>
-            <div class="palette-chip"><span class="palette-swatch grid"></span><span class="palette-name">角</span></div>
-          </div>
-        </div>
+      <section class="style-section">
+        <h1>福澤</h1>
+        <div id="style-blessings" class="blessing-tags style-blessings" aria-label="福澤印記式樣"></div>
       </section>
     </main>
 
-    <script type="module" src="./src/styleGuide.js?v=20260831-14"></script>
+    <script type="module" src="./src/styleGuide.js?v=20260831-22"></script>
   </body>
 </html>

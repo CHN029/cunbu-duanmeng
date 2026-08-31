@@ -1,6 +1,6 @@
 import { drawMerchant } from "./merchantRenderer.js?v=20260825-4";
 import { getSettledLandingPiece } from "../core/board.js?v=20260825-3";
-import { getEncounterEvents, getSlashDamage as getResolvedSlashDamage, isInstantSlashEvent } from "../core/combatRules.js?v=20260831-5";
+import { getEncounterEvents, getSlashDamage as getResolvedSlashDamage, isInstantSlashEvent } from "../core/combatRules.js?v=20260831-6";
 import { COLORS } from "../theme/colors.js?v=20260825-23";
 
 export function createCanvasRenderer(canvas) {

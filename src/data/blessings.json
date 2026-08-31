@@ -136,5 +136,16 @@
     "effects": [
       { "type": "increaseCursedMonsterTreasure", "amount": 1 }
     ]
+  },
+  {
+    "id": "banishEvil",
+    "label": "破邪",
+    "description": "遇鬼斬傷加一",
+    "path": "swordsman",
+    "category": "modifier",
+    "maxStacks": 1,
+    "effects": [
+      { "type": "increaseSlashDamageInCursedEncounter", "amount": 1 }
+    ]
   }
 ]

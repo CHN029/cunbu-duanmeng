@@ -155,8 +155,11 @@ export const MONSTER_BLOCK_CURVE_BASE = {
 // Per-phase shift from weak monsters into stronger monsters.
 export const MONSTER_BLOCK_STRONG_SHIFT_PER_PHASE = 8;
 
-// Monster value bonus formula: max(0, phase - this value).
+// Monster value bonus formula: min(maximum, max(0, phase - offset)).
 export const MONSTER_VALUE_BONUS_PHASE_OFFSET = 2;
+
+// Maximum value added to a monster by difficulty phases.
+export const MAX_MONSTER_VALUE_BONUS = 1;
 
 // --- Starting player stats ---
 

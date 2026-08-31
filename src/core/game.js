@@ -21,11 +21,11 @@ import {
   SLAY_MARK_FADE_MS,
   UPCOMING_BLOCK_PREVIEW_COUNT,
 } from "./config.js?v=20260831-2";
-import { applyBlessingEffects, canReceiveBlessing } from "./blessings.js?v=20260831-5";
-import { clearEncounter, startEncounter, updateEncounter as updateEncounterState } from "./encounterOrchestrator.js?v=20260831-6";
-import { canSkipMerchant, createMerchant, isModifierBlessing, moveMerchantSelectionIndex, shouldOpenMerchant } from "./merchant.js?v=20260831-6";
+import { applyBlessingEffects, canReceiveBlessing } from "./blessings.js?v=20260831-6";
+import { clearEncounter, startEncounter, updateEncounter as updateEncounterState } from "./encounterOrchestrator.js?v=20260831-7";
+import { canSkipMerchant, createMerchant, isModifierBlessing, moveMerchantSelectionIndex, shouldOpenMerchant } from "./merchant.js?v=20260831-7";
 import { createMonsterPiece, createNormalPiece } from "./pieces.js?v=20260824-1";
-import { createRun, getDifficultyPhase, getNextRound, peekUpcomingBlocks } from "./runOrchestrator.js?v=20260831-5";
+import { createRun, getDifficultyPhase, getNextRound, peekUpcomingBlocks } from "./runOrchestrator.js?v=20260831-6";
 
 export function createGame() {
   const game = {

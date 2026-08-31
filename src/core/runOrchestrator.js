@@ -5,13 +5,14 @@ import {
   MONSTER_BLOCK_STRONG_SHIFT_PER_PHASE,
   MONSTER_COUNT_CURVE_BASE,
   MONSTER_COUNT_DOUBLE_SHIFT_PER_PHASE,
+  MAX_MONSTER_VALUE_BONUS,
   MONSTER_VALUE_BONUS_PHASE_OFFSET,
   NORMAL_BLOCKS_PER_ROUND,
   NORMAL_BLOCK_PERCENTAGES,
   RUN_LENGTH,
   UPCOMING_BLOCK_PREVIEW_COUNT,
-} from "./config.js?v=20260831-2";
-import { getNormalBlockWeightMultiplier } from "./blessings.js?v=20260831-5";
+} from "./config.js?v=20260831-3";
+import { getNormalBlockWeightMultiplier } from "./blessings.js?v=20260831-6";
 
 export function createRun(roundCount = RUN_LENGTH) {
   return {
@@ -113,7 +114,7 @@ function getMonsterBlockPercentages(difficultyPhase) {
 }
 
 function getMonsterValueBonus(difficultyPhase) {
-  return Math.max(0, difficultyPhase - MONSTER_VALUE_BONUS_PHASE_OFFSET);
+  return Math.min(MAX_MONSTER_VALUE_BONUS, Math.max(0, difficultyPhase - MONSTER_VALUE_BONUS_PHASE_OFFSET));
 }
 
 function getPhasePressure(difficultyPhase) {

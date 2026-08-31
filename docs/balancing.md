@@ -131,7 +131,7 @@ Base monster values:
 The phase bonus formula is:
 
 ```text
-monsterValueBonus = max(0, phase - 2)
+monsterValueBonus = min(1, max(0, phase - 2))
 ```
 
 Current result:
@@ -141,15 +141,18 @@ Current result:
 | 1 | +0 | 1 | 2 | 3 |
 | 2 | +0 | 1 | 2 | 3 |
 | 3 | +1 | 2 | 3 | 4 |
-| 4 | +2 | 3 | 4 | 5 |
+| 4 | +1 | 2 | 3 | 4 |
 
 Curse adds another +1 to the monster it attaches to.
 
 Tuning knob:
 
 - `MONSTER_VALUE_BONUS_PHASE_OFFSET`
+- `MAX_MONSTER_VALUE_BONUS`
 
-Increase it to delay value scaling. Decrease it to make values rise earlier.
+Change the offset to move value scaling earlier or later. Change the maximum to control its
+late-game ceiling. The current `+1` cap avoids simultaneously adding two health and two attack to
+every phase-four monster.
 
 ## Resource Drops
 
@@ -199,6 +202,10 @@ JSON first; add code only when a new blessing needs a new effect type.
 
 `懸賞` adds 1 treasure to a successful Cursed Monster bounty, changing the reward from 2 to 3. It
 does not reward ordinary monster kills or Cursed Monsters that survive to attack.
+
+`破邪` adds 1 damage to every ordinary Slash in an encounter that already contains a Cursed Monster.
+It makes Curse a build-around risk: the player receives more damage for entering the cursed fight,
+but only after accepting the stronger monster and only if ordinary `斬` blocks are present.
 
 The useful tuning question is:
 

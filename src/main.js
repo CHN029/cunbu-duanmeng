@@ -22,13 +22,13 @@ import {
   togglePause,
   updateBoardAnimations,
   updateEncounter,
-} from "./core/game.js?v=20260831-7";
-import { createCanvasRenderer } from "./renderers/canvasRenderer.js?v=20260831-6";
+} from "./core/game.js?v=20260831-9";
+import { createCanvasRenderer } from "./renderers/canvasRenderer.js?v=20260831-7";
 import { COLORS } from "./theme/colors.js?v=20260825-23";
-import { bindInput, bindSwipeInput } from "./ui/input.js?v=20260831-6";
+import { bindInput, bindSwipeInput } from "./ui/input.js?v=20260831-7";
 import { toChineseNumber } from "./ui/chineseNumbers.js?v=20260821-1";
 import { updateUiEffects } from "./core/uiEffects.js?v=20260824-1";
-import { loadBlessings } from "./core/blessings.js?v=20260831-5";
+import { loadBlessings } from "./core/blessings.js?v=20260831-6";
 
 await loadBlessings();
 
@@ -65,10 +65,24 @@ let dismissingCover = false;
 const rollingStats = {
   treasure: createRollingStat(),
 };
+const blessingTagLabelMap = new Map([
+  ["磨鋒", "磨锋"],
+  ["鍊體", "炼体"],
+  ["斬奪", "斩夺"],
+  ["連斬", "连斩"],
+  ["兵庫", "兵库"],
+  ["甲庫", "甲库"],
+  ["藥圃", "药圃"],
+  ["招財", "招财"],
+  ["呪", "咒"],
+  ["洞機", "动机"],
+  ["懸賞", "悬赏"],
+]);
 const fontsLoaded = Promise.all([
   document.fonts.load(`400 110px "YDW aosagi"`, "随手無常記"),
   document.fonts.load(`400 36px "Huiwen-Fangsong"`, "體寶折戟沉沙克敵制勝"),
   document.fonts.load(`400 36px "Zhaohua"`, "按兵不動"),
+  document.fonts.load(`400 36px "Lishu"`, "回春磨锋连斩炼体重甲斩夺兵库甲库药圃招财咒动机悬赏二三四五六七八九十"),
 ]).catch(() => {}).finally(() => document.body.classList.remove("fonts-loading"));
 
 bindInput(
@@ -241,11 +255,19 @@ function renderBlessings() {
 
   blessings.replaceChildren(
     ...tags.map((label) => {
+      const displayLabel = getBlessingTagDisplayLabel(label);
       const tag = document.createElement("span");
-      tag.className = `blessing-tag${label.startsWith("呪") ? " curse-tag" : ""}`;
-      tag.textContent = label;
+      tag.className = `blessing-tag${displayLabel.startsWith("咒") ? " curse-tag" : ""}`;
+      tag.textContent = displayLabel;
       return tag;
     }),
+  );
+}
+
+function getBlessingTagDisplayLabel(label) {
+  return Array.from(blessingTagLabelMap.entries()).reduce(
+    (text, [from, to]) => text.replaceAll(from, to),
+    label,
   );
 }
 

@@ -14,6 +14,7 @@ const FALLBACK_BLESSINGS = [
   { id: "summonCalamity", label: "招煞", description: "呪較易出現", path: "general", category: "modifier", maxStacks: 1, effects: [{ type: "multiplyNormalBlockWeight", blockType: "C", multiplier: 1.75 }] },
   { id: "seekOpenings", label: "洞機", description: "機較易出現", path: "swordsman", category: "modifier", maxStacks: 1, effects: [{ type: "multiplyNormalBlockWeight", blockType: "O", multiplier: 1.75 }] },
   { id: "bounty", label: "懸賞", description: "斬鬼多得一寶", path: "general", category: "modifier", maxStacks: 1, effects: [{ type: "increaseCursedMonsterTreasure", amount: 1 }] },
+  { id: "banishEvil", label: "破邪", description: "遇鬼斬傷加一", path: "swordsman", category: "modifier", maxStacks: 1, effects: [{ type: "increaseSlashDamageInCursedEncounter", amount: 1 }] },
 ];
 
 let blessings = FALLBACK_BLESSINGS;
@@ -21,6 +22,7 @@ const EFFECT_TYPES_WITH_AMOUNT = new Set([
   "increaseArmorValueBonus",
   "increaseCursedMonsterTreasure",
   "increaseLootChance",
+  "increaseSlashDamageInCursedEncounter",
   "increaseMaxBody",
   "increaseSwordSkill",
   "healBody",
